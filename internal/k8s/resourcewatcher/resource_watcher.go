@@ -91,13 +91,13 @@ func NewResourceWatcher(cluster string, resourceWatcherCli ResourceWatcherCli, s
 func (r *ResourceWatcher) Start(parentCtx context.Context, cfg WatchConfig) *store.Store {
 	ctx, cancel := context.WithCancel(parentCtx)
 	r.cancelFuncs = append(r.cancelFuncs, cancel)
-	s := store.NewStore(ctx, r.storeConfig, r.ctorConfig, cfg.resourceType)
+	resourceStore := store.NewStore(ctx, r.storeConfig, r.ctorConfig, cfg.resourceType)
 	if cfg.pollingPeriod > 0 {
-		go r.pollResource(ctx, cfg, s)
+		go r.pollResource(ctx, cfg, resourceStore)
 	} else {
-		go r.watchResource(ctx, cfg, s, r.namespaces)
+		go r.watchResource(ctx, cfg, resourceStore, r.namespaces)
 	}
-	return s
+	return resourceStore
 }
 
 // Stop closes the watch/poll process of a k8s resource

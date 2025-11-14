@@ -37,8 +37,8 @@ func startWatchOnCluster(ctx context.Context,
 	logrus.Infof("Start cache build on cluster %s", cluster)
 	stores := make([]*store.Store, 0)
 	for _, watchConfig := range watchConfigs {
-		store := watcher.Start(ctx, watchConfig)
-		stores = append(stores, store)
+		resourceStore := watcher.Start(ctx, watchConfig)
+		stores = append(stores, resourceStore)
 	}
 	err = watcher.DumpAPIResources()
 	if err != nil {
@@ -53,7 +53,7 @@ func handleSignals(cancel context.CancelFunc) {
 	for sig := range sigIn {
 		switch sig {
 		case syscall.SIGINT, syscall.SIGTERM:
-			logrus.Errorf("Caught signal '%s' (%d); terminating.", sig, sig)
+			logrus.Infof("Caught signal '%s' (%d); terminating.", sig, sig)
 			cancel()
 		}
 	}
