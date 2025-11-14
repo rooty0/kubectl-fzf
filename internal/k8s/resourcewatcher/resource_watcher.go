@@ -278,8 +278,7 @@ func (r *ResourceWatcher) startWatch(cfg WatchConfig,
 	controller.Run(stop)
 }
 
-func (r *ResourceWatcher) watchResource(ctx context.Context,
-	cfg WatchConfig, store *store.Store, namespaces []string) {
+func (r *ResourceWatcher) watchResource(ctx context.Context, cfg WatchConfig, store *store.Store, namespaces []string) {
 	stop := make(chan struct{})
 	resourceType := cfg.resourceType
 	isNamespaced := resourceType.IsNamespaced()

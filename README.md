@@ -37,7 +37,7 @@ Table of Contents
 
 # Requirements
 
-- go (minimum version 1.19)
+- go (minimum version 1.24)
 - awk
 - [fzf](https://github.com/junegunn/fzf)
 
