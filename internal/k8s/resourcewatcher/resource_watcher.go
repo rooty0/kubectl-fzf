@@ -3,6 +3,7 @@ package resourcewatcher
 import (
 	"context"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
@@ -90,13 +91,13 @@ func NewResourceWatcher(cluster string, resourceWatcherCli ResourceWatcherCli, s
 func (r *ResourceWatcher) Start(parentCtx context.Context, cfg WatchConfig) *store.Store {
 	ctx, cancel := context.WithCancel(parentCtx)
 	r.cancelFuncs = append(r.cancelFuncs, cancel)
-	store := store.NewStore(ctx, r.storeConfig, r.ctorConfig, cfg.resourceType)
+	s := store.NewStore(ctx, r.storeConfig, r.ctorConfig, cfg.resourceType)
 	if cfg.pollingPeriod > 0 {
-		go r.pollResource(ctx, cfg, store)
+		go r.pollResource(ctx, cfg, s)
 	} else {
-		go r.watchResource(ctx, cfg, store, r.namespaces)
+		go r.watchResource(ctx, cfg, s, r.namespaces)
 	}
-	return store
+	return s
 }
 
 // Stop closes the watch/poll process of a k8s resource
@@ -249,8 +250,13 @@ func (r *ResourceWatcher) pollResource(ctx context.Context,
 	}
 }
 
-func (r *ResourceWatcher) startWatch(cfg WatchConfig,
-	store *store.Store, namespace string, stop chan struct{}) {
+func (r *ResourceWatcher) startWatch(
+	cfg WatchConfig,
+	store *store.Store,
+	namespace string,
+	stop chan struct{},
+	stopFunc func(),
+) {
 	cacheListWatch := r.getCacheListWatch(cfg, store, namespace)
 	resourceHandlers := cache.ResourceEventHandlerFuncs{
 		AddFunc:    store.AddResource,
@@ -263,7 +269,7 @@ func (r *ResourceWatcher) startWatch(cfg WatchConfig,
 		// No resync
 		time.Second*0,
 	)
-	controller.AddEventHandler(resourceHandlers)
+	_, _ = controller.AddEventHandler(resourceHandlers)
 	watchErrorHandler := func(reflector *cache.Reflector, err error) {
 		if errors.IsUnauthorized(err) && r.exitOnUnauthorized {
 			logrus.Warnf("Resource %s is unauthorized, stopping watcher", cfg.resourceType)
@@ -271,15 +277,29 @@ func (r *ResourceWatcher) startWatch(cfg WatchConfig,
 		}
 		if errors.IsForbidden(err) {
 			logrus.Warnf("Resource %s is forbidden, stopping watcher. err: %s", cfg.resourceType, err)
-			close(stop)
+			//close(stop)
+			// one owner for each stop channel
+			stopFunc()
 		}
 	}
-	controller.SetWatchErrorHandler(watchErrorHandler)
+	_ = controller.SetWatchErrorHandler(watchErrorHandler)
 	controller.Run(stop)
 }
 
-func (r *ResourceWatcher) watchResource(ctx context.Context, cfg WatchConfig, store *store.Store, namespaces []string) {
+func (r *ResourceWatcher) watchResource(
+	ctx context.Context,
+	cfg WatchConfig,
+	store *store.Store,
+	namespaces []string,
+) {
 	stop := make(chan struct{})
+	var once sync.Once
+	stopFunc := func() {
+		once.Do(func() {
+			close(stop)
+		})
+	}
+
 	resourceType := cfg.resourceType
 	isNamespaced := resourceType.IsNamespaced()
 	if !isNamespaced {
@@ -288,13 +308,16 @@ func (r *ResourceWatcher) watchResource(ctx context.Context, cfg WatchConfig, st
 	if isNamespaced && len(namespaces) > 0 {
 		logrus.Infof("Start watch for %s on namespace %s", resourceType, namespaces)
 		for _, ns := range namespaces {
-			go r.startWatch(cfg, store, ns, stop)
+			go r.startWatch(cfg, store, ns, stop, stopFunc)
 		}
 	} else {
 		logrus.Infof("Start watch for %s on all namespaces", resourceType)
-		go r.startWatch(cfg, store, "", stop)
+		go r.startWatch(cfg, store, "", stop, stopFunc)
 	}
 	<-ctx.Done()
 	logrus.Infof("Exiting watch of %s namespace %s", resourceType, namespaces)
-	close(stop)
+	//close(stop)
+	// No matter how many goroutines call stopFunc(), the underlying close(stop) only runs once
+	//  thanks to sync.Once, so the close of closed channel panic disappears
+	stopFunc()
 }

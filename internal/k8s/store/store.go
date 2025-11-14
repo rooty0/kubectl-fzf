@@ -34,10 +34,14 @@ type Store struct {
 }
 
 // NewStore creates a new store
-func NewStore(ctx context.Context, storeConfig *StoreConfig,
-	ctorConfig resources.CtorConfig, resourceType resources.ResourceType) *Store {
+func NewStore(
+	ctx context.Context,
+	storeConfig *StoreConfig,
+	ctorConfig resources.CtorConfig,
+	resourceType resources.ResourceType,
+) *Store {
 	k := Store{}
-	k.data = make(map[string]resources.K8sResource, 0)
+	k.data = make(map[string]resources.K8sResource)
 	k.resourceCtor = resources.ResourceTypeToCtor(resourceType)
 	k.resourceType = resourceType
 	k.currentFile = nil
