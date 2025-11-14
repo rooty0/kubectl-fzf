@@ -133,10 +133,12 @@ flowchart TB
         comp[kubectl-fzf-completion]
         server[kubectl-fzf-server]
     end
-    shell -- kubectl get pods TAB --> comp -- Read content and feed it to fzf --> fileNode
-    server -- Write autocompletion informations --> fileNode
 
-    k8s <-- Watch --o server
+    shell -- "kubectl get pods <TAB>" --> comp
+    comp -- "Parse kubectl output" --> fileNode
+    server -- "Write autocompletion informations" --> fileNode
+
+    server -- "Watch" --> k8s
 ```
 
 `kubectl-fzf-server` will watch cluster resources and keep the current state of the cluster in local files.
@@ -177,10 +179,10 @@ flowchart TB
     end
 
 
-    shell -- kubectl get pods TAB --> comp 
-    comp -- Through port forward\nGET /k8s/resources/pods --> server
+    shell -- "kubectl get pods <TAB>" --> comp
+    comp  -- "Through port forward<br/>GET /k8s/resources/pods" --> server
 
-    k8s <-- Watch --o server
+    server -- "Watch" --> k8s
 ```
 
 If the pod is deployed in your cluster, the autocompletion will be fetched automatically fetched using port forward.
