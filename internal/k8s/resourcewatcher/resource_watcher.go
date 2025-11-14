@@ -110,15 +110,15 @@ func (r *ResourceWatcher) Stop() {
 
 // GetWatchConfigs creates the list of k8s to watch
 func (r *ResourceWatcher) GetWatchConfigs() ([]WatchConfig, error) {
-	clientset, err := r.storeConfig.GetClientset()
+	clientSet, err := r.storeConfig.GetClientset()
 	if err != nil {
 		return nil, err
 	}
-	coreGetter := clientset.CoreV1().RESTClient()
-	appsGetter := clientset.AppsV1().RESTClient()
-	autoscalingGetter := clientset.AutoscalingV1().RESTClient()
-	networkingGetter := clientset.NetworkingV1().RESTClient()
-	batchGetter := clientset.BatchV1().RESTClient()
+	coreGetter := clientSet.CoreV1().RESTClient()
+	appsGetter := clientSet.AppsV1().RESTClient()
+	autoscalingGetter := clientSet.AutoscalingV1().RESTClient()
+	networkingGetter := clientSet.NetworkingV1().RESTClient()
+	batchGetter := clientSet.BatchV1().RESTClient()
 	allWatchConfigs := []WatchConfig{
 		{resources.ResourceTypePod, coreGetter, &corev1.Pod{}, true, 0},
 		{resources.ResourceTypeConfigMap, coreGetter, &corev1.ConfigMap{}, true, 0},
@@ -139,7 +139,7 @@ func (r *ResourceWatcher) GetWatchConfigs() ([]WatchConfig, error) {
 		{resources.ResourceTypeNode, coreGetter, &corev1.Node{}, false, r.nodePollingPeriod},
 		{resources.ResourceTypeNamespace, coreGetter, &corev1.Namespace{}, false, r.namespacePollingPeriod},
 	}
-	watchConfigs := []WatchConfig{}
+	var watchConfigs []WatchConfig
 	for _, w := range allWatchConfigs {
 		if _, ok := r.excludeResourcesSet[w.resourceType]; ok {
 			continue
@@ -153,8 +153,8 @@ func (r *ResourceWatcher) GetWatchConfigs() ([]WatchConfig, error) {
 	return watchConfigs, nil
 }
 
-func (r *ResourceWatcher) doPoll(cacheListWatch *cache.ListWatch, store *store.Store) {
-	obj, err := cacheListWatch.List(metav1.ListOptions{})
+func (r *ResourceWatcher) doPoll(ctx context.Context, cacheListWatch *cache.ListWatch, store *store.Store) {
+	obj, err := cacheListWatch.ListWithContext(ctx, metav1.ListOptions{})
 	if err != nil {
 		logrus.Warningf("Error on listing resource: %v", err)
 	}
@@ -165,7 +165,7 @@ func (r *ResourceWatcher) doPoll(cacheListWatch *cache.ListWatch, store *store.S
 	store.AddResourceList(lst)
 }
 
-// FetchNamespaces gets the list of namespace from the cluster and fill
+// FetchNamespaces gets the list of namespace from the cluster and fills
 // the resource watcher with an initial list of namespaces
 // This is only useful when we need to filter namespaces
 func (r *ResourceWatcher) FetchNamespaces(ctx context.Context) error {
@@ -174,11 +174,11 @@ func (r *ResourceWatcher) FetchNamespaces(ctx context.Context) error {
 		return nil
 	}
 
-	clientset, err := r.storeConfig.GetClientset()
+	clientSet, err := r.storeConfig.GetClientset()
 	if err != nil {
 		return err
 	}
-	namespaces, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	namespaces, err := clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		for _, watchNamespace := range r.watchNamespaces {
 			r.namespaces = append(r.namespaces, watchNamespace.String())
@@ -205,11 +205,11 @@ func (r *ResourceWatcher) FetchNamespaces(ctx context.Context) error {
 // DumpAPIResources dumps api resources file
 func (r *ResourceWatcher) DumpAPIResources() error {
 	destFile := r.storeConfig.GetResourceStorePath(resources.ResourceTypeApiResource)
-	clientset, err := r.storeConfig.GetClientset()
+	clientSet, err := r.storeConfig.GetClientset()
 	if err != nil {
 		return err
 	}
-	resourceLists, err := clientset.Discovery().ServerPreferredResources()
+	resourceLists, err := clientSet.Discovery().ServerPreferredResources()
 	if err != nil {
 		return err
 	}
@@ -233,11 +233,14 @@ func (r *ResourceWatcher) getCacheListWatch(cfg WatchConfig, store *store.Store,
 	return cacheListWatch
 }
 
-func (r *ResourceWatcher) pollResource(ctx context.Context,
-	cfg WatchConfig, store *store.Store) {
+func (r *ResourceWatcher) pollResource(
+	ctx context.Context,
+	cfg WatchConfig,
+	store *store.Store,
+) {
 	logrus.Infof("Start poller for %s", cfg.resourceType)
 	cacheListWatch := r.getCacheListWatch(cfg, store, "")
-	r.doPoll(cacheListWatch, store)
+	r.doPoll(ctx, cacheListWatch, store)
 	ticker := time.NewTicker(cfg.pollingPeriod)
 	for {
 		select {
@@ -245,7 +248,7 @@ func (r *ResourceWatcher) pollResource(ctx context.Context,
 			logrus.Infof("Exiting poll of %s", cfg.resourceType)
 			return
 		case <-ticker.C:
-			r.doPoll(cacheListWatch, store)
+			r.doPoll(ctx, cacheListWatch, store)
 		}
 	}
 }
