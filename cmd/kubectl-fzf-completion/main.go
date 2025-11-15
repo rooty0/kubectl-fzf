@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/pprof"
+	"strings"
 
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/completion"
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/fetcher"
@@ -29,6 +30,7 @@ var (
 	gitBranch = "unknown"
 	goVersion = "unknown"
 	buildDate = "unknown"
+	fzfArgs   = []string{"-1", "--header-lines=2", "--layout", "reverse", "--exact", "--no-hscroll", "--no-sort", "--cycle"}
 )
 
 func versionFun(cmd *cobra.Command, args []string) {
@@ -88,8 +90,11 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 	}
 	formattedComps := completionResults.GetFormattedOutput()
 
+	if args, exist := os.LookupEnv("KUBECTL_FZF_ARGS"); exist {
+		fzfArgs = strings.Split(args, " ")
+	}
 	query := completion.ExtractQueryFromArgs(args)
-	fzfResult, err := fzf.CallFzf(formattedComps, query)
+	fzfResult, err := fzf.CallFzf(formattedComps, query, fzfArgs)
 	if err != nil {
 		if e, ok := err.(fzf.InterruptedCommandError); ok {
 			logrus.Infof("Fzf was interrupted: %s", e)

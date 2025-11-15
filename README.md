@@ -218,6 +218,11 @@ By default, the local port used for the port-forward is 8080. You can override i
 KUBECTL_FZF_PORT_FORWARD_LOCAL_PORT=8081
 ```
 
+You can override FZF arguments using an environment variable:
+```
+KUBECTL_FZF_ARGS="-1 --header-lines=2 --layout reverse --exact --no-hscroll --no-sort --cycle"
+```
+
 # Troubleshooting
 
 ## Debug kubectl-fzf-completion
