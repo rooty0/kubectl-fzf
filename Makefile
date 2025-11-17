@@ -1,6 +1,7 @@
 all: build test
 
 LD_FLAGS=-ldflags "-X 'main.gitCommit=$(shell git rev-parse --short HEAD)' -X 'main.gitBranch=$(shell git rev-parse --abbrev-ref HEAD)' -X 'main.goVersion=$(shell go version)' -X 'main.buildDate=$(shell date -Iseconds -u)' -X 'main.version=$(shell git describe --tags)'"
+BINS := kubectl-fzf-completion kubectl-fzf-server
 
 build:
 	go build $(LD_FLAGS) ./cmd/kubectl-fzf-server
@@ -43,3 +44,4 @@ graph:
 
 clean:
 	go clean
+	rm -f $(BINS)
