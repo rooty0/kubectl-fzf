@@ -70,7 +70,13 @@ func (f *Fetcher) getKubectlFzfPod(ctx context.Context) (*corev1.Pod, error) {
 		return nil, err
 	}
 	if len(podList.Items) == 0 {
-		err = fmt.Errorf("no kubectl-fzf pods found, bailing out")
+		err = fmt.Errorf(
+			"no kubectl-fzf pods found.\n\n" +
+				"The 'stats' command require a running kubectl-fzf-server:\n" +
+				"  - either as a Kubernetes pod labeled app=kubectl-fzf (port-forward mode), or\n" +
+				"  - via a local HTTP endpoint passed with --http-endpoint\n" +
+				"  -  e.g., ./kubectl-fzf-completion stats --http-endpoint localhost:18080\n",
+		)
 		return nil, err
 	}
 	pod := podList.Items[0]
@@ -102,7 +108,7 @@ func (f *Fetcher) getPortForwardRequest(ctx context.Context) (portForwardRequest
 	return
 }
 
-func (f *Fetcher) openPortForward(ctx context.Context) (chan (struct{}), error) {
+func (f *Fetcher) openPortForward(ctx context.Context) (chan struct{}, error) {
 	stopChan := make(chan struct{})
 	readyChan := make(chan struct{})
 	errChan := make(chan error)

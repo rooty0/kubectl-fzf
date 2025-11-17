@@ -213,7 +213,7 @@ kubectl <TAB>
 
 ### Configuration
 
-By default, the local port used for the port-forward is 8080. You can override it through an environment variable:
+By default, the local port used for the port-forward is `18080`. You can override it through an environment variable:
 ```
 KUBECTL_FZF_PORT_FORWARD_LOCAL_PORT=8081
 ```

@@ -23,6 +23,6 @@ func GetTestFetcher(t *testing.T, clusterName string, port int) (*fetcher.Fetche
 }
 
 func GetTestFetcherWithDefaults(t *testing.T) *fetcher.Fetcher {
-	f, _ := GetTestFetcher(t, "minikube", 8080)
+	f, _ := GetTestFetcher(t, "minikube", 18080)
 	return f
 }

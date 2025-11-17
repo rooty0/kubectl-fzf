@@ -23,7 +23,7 @@ func SetFetchConfigFlags(fs *pflag.FlagSet) {
 	fs.String("http-endpoint", "", "Force completion to fetch data from a specific http endpoint.")
 	fs.String("fetcher-cache-path", "/tmp/kubectl_fzf_cache/fetcher_cache", "Location of cached resources fetched from a remote kubectl-fzf instance.")
 	fs.String("fzf-namespace", "", "The namespace to look for a kubectl-fzf pod.")
-	fs.Int("port-forward-local-port", 8080, "The local port to use for port-forward.")
+	fs.Int("port-forward-local-port", 18080, "The local port to use for port-forward.")
 	fs.Duration("minimum-cache", 5*time.Second, "The minimum duration after which the http endpoint will be queried to check for resource modification.")
 }
 

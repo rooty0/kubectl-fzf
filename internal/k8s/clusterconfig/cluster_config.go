@@ -91,6 +91,14 @@ func (c *ClusterConfig) GetClientConfig() (*rest.Config, error) {
 	if err == nil {
 		return restConfig, nil
 	}
+
+	// Fallback to local kubeconfig. Make sure it's loaded before we dereference it.
+	if c.apiConfig == nil {
+		if err := c.LoadClusterConfig(); err != nil {
+			return nil, err
+		}
+	}
+
 	cmdConfig := clientcmd.NewDefaultClientConfig(*c.apiConfig, nil)
 	restConfig, err = cmdConfig.ClientConfig()
 	return restConfig, err
