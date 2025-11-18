@@ -47,3 +47,12 @@ func ParseNamespaceFromArgs(args []string) *string {
 	}
 	return nil
 }
+
+func HasAllNamespacesFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "-A" || arg == "--all-namespaces" {
+			return true
+		}
+	}
+	return false
+}

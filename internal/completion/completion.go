@@ -54,8 +54,12 @@ func ExtractQueryFromArgs(cmdArgs []string) string {
 	return latestArg
 }
 
-func processCommandArgsWithFetchConfig(ctx context.Context, fetchConfig *fetcher.Fetcher,
-	cmdVerb string, args []string) (*CompletionResult, error) {
+func processCommandArgsWithFetchConfig(
+	ctx context.Context,
+	fetchConfig *fetcher.Fetcher,
+	cmdVerb string,
+	args []string,
+) (*CompletionResult, error) {
 	var err error
 	resourceType, flagCompletion, err := parse.ParseFlagAndResources(cmdVerb, args)
 	if err != nil {
@@ -64,7 +68,31 @@ func processCommandArgsWithFetchConfig(ctx context.Context, fetchConfig *fetcher
 	logrus.Debugf("Call Get Fun with %+v, resource type detected %s, flag detected %s", args, resourceType, flagCompletion)
 
 	completionResult := &CompletionResult{Cluster: fetchConfig.GetContext()}
+
+	// Figure out which namespace to use for completion:
+	// 1) -n/--namespace wins
+	// 2) -A/--all-namespaces → no filtering (all namespaces)
+	// 3) otherwise, for namespaced resources, use the current context's namespace
 	namespace := parse.ParseNamespaceFromArgs(args)
+	allNamespaces := parse.HasAllNamespacesFlag(args)
+
+	if allNamespaces {
+		// Explicitly, all namespaces: do not filter
+		namespace = nil
+	} else if namespace == nil && resourceType.IsNamespaced() {
+		// Default to current context's namespace for namespaced resources
+		if ns, err := fetchConfig.GetNamespace(); err == nil {
+			// kubeconfig can omit namespace to mean "default"
+			if ns == "" {
+				ns = "default"
+			}
+			namespace = &ns
+		} else {
+			// If we can't get the namespace for some reason, fall back to "all"
+			logrus.Debugf("Could not determine current namespace, falling back to all: %v", err)
+		}
+	}
+
 	if flagCompletion == parse.FlagLabel {
 		completionResult.Header, completionResult.Completions, err = GetTagResourceCompletion(ctx, resourceType, namespace, fetchConfig, TagTypeLabel)
 		return completionResult, err
