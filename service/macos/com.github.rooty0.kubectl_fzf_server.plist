@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <!-- Name of the service -->
+        <key>Label</key>
+        <string>com.github.rooty0.kubectl-fzf-server</string>
+
+        <!-- What to run (absolute path, like /usr/local/bin/kubectl-fzf-server) -->
+        <key>ProgramArguments</key>
+        <array>
+            <string>/ABSOLUTE/PATH/TO/kubectl-fzf-server</string>
+        </array>
+
+        <key>EnvironmentVariables</key>
+        <dict>
+            <!-- Remove this block if you don't need a custom KUBECONFIG -->
+            <key>KUBECONFIG</key>
+            <string>/Users/YOURUSER/.kube/config</string>
+
+            <!-- Adjust this PATH to match your system -->
+            <key>PATH</key>
+            <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        </dict>
+
+        <!-- Start when the agent is loaded (typically at login) -->
+        <key>RunAtLoad</key>
+        <true/>
+
+        <!-- Restart on crash / exit -->
+        <key>KeepAlive</key>
+        <dict>
+            <!-- Only restart if it exits unexpectedly -->
+            <key>SuccessfulExit</key>
+            <false/>
+            <!-- Rough equivalent of After/Wants network-online.target -->
+            <key>NetworkState</key>
+            <true/>
+        </dict>
+
+        <!-- Throttle restarts; 10 seconds -->
+        <key>ThrottleInterval</key>
+        <integer>10</integer>
+
+        <!-- Logs -->
+        <key>StandardOutPath</key>
+        <string>/Users/YOURUSER/Library/Logs/kubectl-fzf-server.log</string>
+        <key>StandardErrorPath</key>
+        <string>/Users/YOURUSER/Library/Logs/kubectl-fzf-server-error.log</string>
+    </dict>
+</plist>
