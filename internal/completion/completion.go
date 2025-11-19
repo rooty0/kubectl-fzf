@@ -51,6 +51,13 @@ func ExtractQueryFromArgs(cmdArgs []string) string {
 	if latestArg == " " {
 		return ""
 	}
+	// If the last token is just the namespace flag itself, don't use it as the query.
+	// This covers:
+	//   k get pods -n<TAB>          -> last == "-n"
+	//   k get pods --namespace<TAB> -> last == "--namespace"
+	if latestArg == "-n" || latestArg == "--namespace" {
+		return ""
+	}
 	return latestArg
 }
 
@@ -61,6 +68,27 @@ func processCommandArgsWithFetchConfig(
 	args []string,
 ) (*CompletionResult, error) {
 	var err error
+
+	// 0. Special case: completing the value of -n / --namespace
+	if isNamespaceValueCompletion(args) {
+		completionResult := &CompletionResult{
+			Cluster: fetchConfig.GetContext(),
+		}
+
+		// Use the Namespace resource type; this will list namespaces from the store.
+		resourceType := resources.ResourceTypeNamespace
+		completionResult.Header = resources.ResourceToHeader(resourceType)
+
+		// Namespaces are cluster-scoped, so no namespace filter here.
+		completionResult.Completions, err = getResourceCompletion(ctx, resourceType, nil, fetchConfig)
+		if err != nil {
+			return completionResult, errors.Wrap(err, "error getting namespace completion")
+		}
+		sort.Strings(completionResult.Completions)
+		return completionResult, nil
+	}
+
+	// 1. Normal resource/flag completion flow
 	resourceType, flagCompletion, err := parse.ParseFlagAndResources(cmdVerb, args)
 	if err != nil {
 		return nil, err
@@ -80,7 +108,7 @@ func processCommandArgsWithFetchConfig(
 		// Explicitly, all namespaces: do not filter
 		namespace = nil
 	} else if namespace == nil && resourceType.IsNamespaced() {
-		// Default to current context's namespace for namespaced resources
+		// Default to the current context's namespace for namespaced resources
 		if ns, err := fetchConfig.GetNamespace(); err == nil {
 			// kubeconfig can omit namespace to mean "default"
 			if ns == "" {
@@ -115,4 +143,28 @@ func ProcessCommandArgs(cmdVerb string, args []string, f *fetcher.Fetcher) (*Com
 	completionResult, err := processCommandArgsWithFetchConfig(ctx, f, cmdVerb, args)
 	cancel()
 	return completionResult, err
+}
+
+// isNamespaceValueCompletion returns true when the current completion context
+// is for the value of -n/--namespace, e.g.:
+//
+//	get pods -n
+//	get pods -n cor
+func isNamespaceValueCompletion(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	lastIdx := len(args) - 1
+
+	for i, arg := range args {
+		if arg == "-n" || arg == "--namespace" {
+			// Cases:
+			//   ... -n<TAB>           -> args [..., "-n"]        (i == lastIdx)
+			//   ... -n cor<TAB>       -> args [..., "-n", "cor"] (i+1 == lastIdx)
+			if i == lastIdx || i+1 == lastIdx {
+				return true
+			}
+		}
+	}
+	return false
 }
