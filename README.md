@@ -4,6 +4,17 @@ kubectl-fzf provides a fast and powerful fzf autocompletion for kubectl.
 
 [![asciicast](https://asciinema.org/a/yHKY5vQ40ZaOwMQnhLfYJ5Pja.png)](https://asciinema.org/a/yHKY5vQ40ZaOwMQnhLfYJ5Pja?t=01)
 
+Hello! 👋 This repository is a maintained fork of the original project at
+[bonnefoa/kubectl-fzf](https://github.com/bonnefoa/kubectl-fzf/).
+
+I attempted to reach out to the original author but haven't received a reply, so I decided to continue the work here to keep the project alive and updated.
+
+The `fork` branch is now the primary branch - that's where all new development and fixes happen. The `main` branch is kept in sync with upstream, just in case the original project becomes active again. 
+
+If you'd like to contribute, please make sure to open your pull requests against the `fork` branch.
+
+I'm not planning to maintain the GitHub Releases page the way it was done upstream. Instead, please refer to the section below for instructions on how to build the project - it's super easy.
+
 Table of Contents
 =================
 
@@ -45,17 +56,18 @@ Table of Contents
 
 ## kubectl-fzf binaries
 
+The original `go install` method won't work because the `go.mod` file references the upstream module path.
+Instead, just build the binaries for your architecture locally - it's extremely easy.
+
 ```shell
-# Completion binary called during autocompletion
-go install github.com/bonnefoa/kubectl-fzf/v3/cmd/kubectl-fzf-completion@main
-# If you want to run the kubectl-fzf server locally
-go install github.com/bonnefoa/kubectl-fzf/v3/cmd/kubectl-fzf-server@main
+brew install go # Ensure Go is installed first. If you're not on macOS, download it here: https://go.dev/doc/install
+git clone --depth 1 https://github.com/rooty0/kubectl-fzf.git && cd kubectl-fzf
+make build # Run to generate the two binaries: kubectl-fzf-completion and kubectl-fzf-server
 ```
 
-`kubectl-fzf-completion` needs to be in you $PATH so make sure that your $GOPATH bin is included:
-```
-PATH=$PATH:$GOPATH/bin
-```
+Note: Use `kubectl-fzf-server` only if you want to run the server locally
+
+Make sure `kubectl-fzf-completion` is in your `$PATH`, as this is what your shell executes
 
 ## Shell autocompletion
 
@@ -93,7 +105,7 @@ helm template --namespace myns --set image.kubectl_fzf_server.tag=v3 --set toler
 
 You can check the latest image version [here](https://cloud.docker.com/repository/docker/bonnefoa/kubectl-fzf/general).
 
-### Install kubectl-fzf-server as a systemd service
+### Install kubectl-fzf-server as a service
 
 You can install `kubectl-fzf-server` as a systemd unit server.
 
@@ -116,6 +128,8 @@ systemctl --user enable kubectl_fzf_server.service
 # Get log
 journalctl --user-unit=kubectl_fzf_server.service
 ```
+
+To use `launchd` on **macOS** to run the `kubectl_fzf_server`, please refer to [this page](https://github.com/rooty0/kubectl-fzf/tree/fork/service/macos).
 
 # Usage
 
