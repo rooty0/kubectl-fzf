@@ -81,9 +81,6 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 		os.Exit(FallbackExitCode)
 	}
 
-	if err != nil {
-		logrus.Fatalf("Completion error: %s", err)
-	}
 	if len(completionResults.Completions) == 0 {
 		logrus.Warn("No completion found")
 		os.Exit(5)
