@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime/pprof"
@@ -22,7 +23,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-const FallbackExitCode = 6
+const (
+	FallbackExitCode = 6
+	OKExitCode       = 0
+)
 
 var (
 	version   = "dev"
@@ -93,9 +97,10 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 	query := completion.ExtractQueryFromArgs(args)
 	fzfResult, err := fzf.CallFzf(formattedComps, query, fzfArgs)
 	if err != nil {
-		if e, ok := err.(fzf.InterruptedCommandError); ok {
+		var e fzf.InterruptedCommandError
+		if errors.As(err, &e) {
 			logrus.Infof("Fzf was interrupted: %s", e)
-			os.Exit(FallbackExitCode)
+			os.Exit(OKExitCode) // User interrupted fzf, not an error, do not fallback to kubectl autocomplete
 		}
 		logrus.Fatalf("Call fzf error: %s", err)
 	}

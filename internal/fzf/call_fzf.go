@@ -62,8 +62,18 @@ func CallFzf(comps string, query string, fzfArgs []string) (string, error) {
 
 	err = cmd.Wait()
 	if err != nil {
-		if cmd.ProcessState.ExitCode() == 130 {
-			// Interrupted with C-c or ESC
+		/*
+			FZF EXIT STATUS
+			       0      Normal exit
+			       1      No match
+			       2      Error
+			       126    Permission denied error from become action
+			       127    Invalid shell command for become action
+			       130    Interrupted with CTRL-C or ESC
+		*/
+		exitCode := cmd.ProcessState.ExitCode()
+		if exitCode == 130 || exitCode == 1 {
+			// Interrupted with C-c or ESC or no match
 			return "", InterruptedCommandError(err.Error())
 		}
 		return "", err
