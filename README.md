@@ -74,12 +74,12 @@ Make sure `kubectl-fzf-completion` is in your `$PATH`, as this is what your shel
 Source the autocompletion functions:
 ```
 # bash version
-wget https://raw.githubusercontent.com/bonnefoa/kubectl-fzf/main/shell/kubectl_fzf.bash -O ~/.kubectl_fzf.bash
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.bash -O ~/.kubectl_fzf.bash
 echo "source <(kubectl completion bash)" >> ~/.bashrc
 echo "source ~/.kubectl_fzf.bash" >> ~/.bashrc
 
 # zsh version
-wget https://raw.githubusercontent.com/bonnefoa/kubectl-fzf/main/shell/kubectl_fzf.plugin.zsh -O ~/.kubectl_fzf.plugin.zsh
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.plugin.zsh -O ~/.kubectl_fzf.plugin.zsh
 echo "source <(kubectl completion zsh)" >> ~/.zshrc
 echo "source ~/.kubectl_fzf.plugin.zsh" >> ~/.zshrc
 ```
@@ -89,7 +89,7 @@ echo "source ~/.kubectl_fzf.plugin.zsh" >> ~/.zshrc
 You can use [antigen](https://github.com/zsh-users/antigen) to load it as a zsh plugin
 ```shell
 antigen bundle robbyrussell/oh-my-zsh plugins/docker
-antigen bundle bonnefoa/kubectl-fzf@main shell/
+antigen bundle rooty0/kubectl-fzf@main shell/
 ```
 
 ## kubectl-fzf-server
@@ -98,7 +98,7 @@ antigen bundle bonnefoa/kubectl-fzf@main shell/
 
 You can deploy `kubectl-fzf-server` as a pod in your cluster.
 
-From the [k8s directory](https://github.com/bonnefoa/kubectl-fzf/tree/main/k8s):
+From the [k8s directory](https://github.com/rooty0/kubectl-fzf/tree/main/k8s):
 ```shell
 helm template --namespace myns --set image.kubectl_fzf_server.tag=v3 --set toleration=aToleration . | kubectl apply -f -
 ```
@@ -112,7 +112,7 @@ You can install `kubectl-fzf-server` as a systemd unit server.
 ```
 # Create user systemd config
 mkdir -p ~/.config/systemd/user
-wget https://raw.githubusercontent.com/bonnefoa/kubectl-fzf/main/systemd/kubectl_fzf_server.service -O ~/.config/systemd/user/kubectl_fzf_server.service
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/systemd/kubectl_fzf_server.service -O ~/.config/systemd/user/kubectl_fzf_server.service
 # Set fullpath of kubectl-fzf-server
 sed -i "s#INSTALL_PATH#$GOPATH/bin#" ~/.config/systemd/user/kubectl_fzf_server.service
 
@@ -129,7 +129,7 @@ systemctl --user enable kubectl_fzf_server.service
 journalctl --user-unit=kubectl_fzf_server.service
 ```
 
-To use `launchd` on **macOS** to run the `kubectl_fzf_server`, please refer to [this page](https://github.com/rooty0/kubectl-fzf/tree/fork/service/macos).
+To use `launchd` on **macOS** to run the `kubectl_fzf_server`, please refer to [this page](service/macos/README.md).
 
 # Usage
 
