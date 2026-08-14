@@ -80,7 +80,7 @@ func StartKubectlFzfServer() {
 	ticker := time.NewTicker(time.Second * 5)
 
 	httpServerConfCli := httpserver.GetHttpServerConfigCli()
-	_, err = httpserver.StartHttpServer(ctx, &httpServerConfCli, storeConfig, stores)
+	fzfHttpServer, err := httpserver.StartHttpServer(ctx, &httpServerConfCli, storeConfig, stores)
 	if err != nil {
 		logrus.Fatalf("Error starting http server: %s", err)
 	}
@@ -107,8 +107,9 @@ func StartKubectlFzfServer() {
 				if err != nil {
 					logrus.Fatalf("error creating destination dir: %s", err)
 				}
-				watcher, _, err = startWatchOnCluster(ctx, resourceWatcherCli, storeConfig)
+				watcher, stores, err = startWatchOnCluster(ctx, resourceWatcherCli, storeConfig)
 				util.FatalIf(err)
+				fzfHttpServer.SetStores(stores)
 				currentContext = newContext
 			}
 		}

@@ -153,6 +153,18 @@ func (r *ResourceWatcher) GetWatchConfigs() ([]WatchConfig, error) {
 	return watchConfigs, nil
 }
 
+// stripManagedFields drops the managedFields of an object. They are never used
+// to build the completion and account for a large part of the retained memory.
+// Skipping objects that are already stripped avoids writing to an object another
+// goroutine may be reading when a relist re-runs the transform,
+// see https://github.com/kubernetes/kubernetes/issues/124337
+func stripManagedFields(obj interface{}) (interface{}, error) {
+	if accessor, err := apimeta.Accessor(obj); err == nil && accessor.GetManagedFields() != nil {
+		accessor.SetManagedFields(nil)
+	}
+	return obj, nil
+}
+
 func (r *ResourceWatcher) doPoll(ctx context.Context, cacheListWatch *cache.ListWatch, store *store.Store) {
 	obj, err := cacheListWatch.ListWithContext(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -161,6 +173,10 @@ func (r *ResourceWatcher) doPoll(ctx context.Context, cacheListWatch *cache.List
 	lst, err := apimeta.ExtractList(obj)
 	if err != nil {
 		logrus.Warningf("Error extracting list: %v", err)
+	}
+	// Polled resources bypass the informer, so the transform has to be applied here
+	for _, item := range lst {
+		_, _ = stripManagedFields(item)
 	}
 	store.AddResourceList(lst)
 }
@@ -286,6 +302,9 @@ func (r *ResourceWatcher) startWatch(
 		}
 	}
 	_ = controller.SetWatchErrorHandler(watchErrorHandler)
+	if err := controller.SetTransform(stripManagedFields); err != nil {
+		logrus.Warnf("Could not set transform for %s: %v", cfg.resourceType, err)
+	}
 	controller.Run(stop)
 }
 

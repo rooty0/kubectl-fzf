@@ -3,27 +3,17 @@ package storetest
 import (
 	"context"
 	"io/ioutil"
-	"os"
-	"path"
 	"testing"
 	"time"
 
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/store"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func TestMain(m *testing.M) {
-	logrus.SetLevel(logrus.DebugLevel)
-	code := m.Run()
-	os.Exit(code)
-}
 
 func podResource(name string, ns string, labels map[string]string) corev1.Pod {
 	meta := corev1.Pod{
@@ -51,7 +41,7 @@ func GetTestPodStore(t *testing.T) (string, *store.Store) {
 	err = storeConfig.CreateDestDir()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(cancel)
 	ctorConfig := resources.CtorConfig{}
 	k8sStore := store.NewStore(ctx, storeConfig, ctorConfig, resources.ResourceTypePod)
 	assert.Nil(t, err)
@@ -67,44 +57,3 @@ func GetTestPodStore(t *testing.T) (string, *store.Store) {
 	return tempDir, k8sStore
 }
 
-func TestDumpPodFullState(t *testing.T) {
-	tempDir, k := GetTestPodStore(t)
-	defer util.RemoveTempDir(tempDir)
-
-	err := k.DumpFullState()
-	require.NoError(t, err)
-	podFilePath := path.Join(tempDir, "test", "pods")
-	assert.FileExists(t, podFilePath)
-
-	pods := map[string]resources.K8sResource{}
-	err = util.LoadGobFromFile(&pods, podFilePath)
-	require.NoError(t, err)
-
-	assert.Equal(t, 4, len(pods))
-	assert.Contains(t, pods, "ns1_Test1")
-	assert.Contains(t, pods, "ns2_Test2")
-	assert.Contains(t, pods, "ns2_Test3")
-	assert.Contains(t, pods, "aaa_Test4")
-}
-
-func TestTickerPodDumpFullState(t *testing.T) {
-	tempDir, s := GetTestPodStore(t)
-	defer util.RemoveTempDir(tempDir)
-
-	time.Sleep(1000 * time.Millisecond)
-	podFilePath := path.Join(tempDir, "test", "pods")
-	assert.FileExists(t, podFilePath)
-	pods := map[string]resources.K8sResource{}
-	err := util.LoadGobFromFile(&pods, podFilePath)
-	require.NoError(t, err)
-	assert.Equal(t, 4, len(pods))
-
-	pod := podResource("Test1", "ns1", map[string]string{"app": "app1"})
-	s.AddResource(&pod)
-	fileInfoBefore, err := os.Stat(podFilePath)
-	require.NoError(t, err)
-	time.Sleep(1000 * time.Millisecond)
-	fileInfoAfter, err := os.Stat(podFilePath)
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, fileInfoBefore.ModTime(), fileInfoAfter.ModTime())
-}

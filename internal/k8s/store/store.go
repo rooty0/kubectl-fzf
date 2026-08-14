@@ -27,7 +27,10 @@ type Store struct {
 	storeConfig  *StoreConfig
 	firstWrite   bool
 
-	dataMutex sync.Mutex
+	// mutex guards data, dumpRequired and lastFullDump. They are touched by the
+	// watch handlers, the poller, the dump ticker and the stats HTTP handler,
+	// which all run on their own goroutine.
+	mutex sync.RWMutex
 
 	dumpRequired bool
 	lastFullDump time.Time
@@ -49,19 +52,26 @@ func NewStore(
 	k.firstWrite = true
 	k.ctorConfig = ctorConfig
 	k.lastFullDump = time.Time{}
-	go k.fullDumpTicker()
+	go k.fullDumpTicker(ctx)
 
 	return &k
 }
 
-func (k *Store) fullDumpTicker() {
+func (k *Store) fullDumpTicker(ctx context.Context) {
 	timeBetweenFullDump := k.storeConfig.GetTimeBetweenFullDump()
 	logrus.Debugf("Starting ticker loop for %s: will do full dump every %s", k.resourceType, timeBetweenFullDump)
 	t := time.NewTicker(timeBetweenFullDump)
+	defer t.Stop()
 	for {
-		<-t.C
-		err := k.DumpFullState()
-		util.FatalIf(err)
+		select {
+		case <-ctx.Done():
+			logrus.Debugf("Stopping full dump ticker for %s", k.resourceType)
+			return
+		case <-t.C:
+			if err := k.DumpFullState(); err != nil {
+				logrus.Errorf("Full dump of %s failed: %v", k.resourceType, err)
+			}
+		}
 	}
 }
 
@@ -85,14 +95,17 @@ func resourceKey(obj interface{}) string {
 
 // AddResourceList clears current state add the objects to the store.
 // It will trigger a full dump
-// This is used for polled resources, no need for mutex
+// This is used for polled resources
 func (k *Store) AddResourceList(lstRuntime []runtime.Object) {
-	k.data = make(map[string]resources.K8sResource, 0)
+	data := make(map[string]resources.K8sResource, len(lstRuntime))
 	for _, runtimeObject := range lstRuntime {
 		key := resourceKey(runtimeObject)
 		resource := k.resourceCtor(runtimeObject, k.ctorConfig)
-		k.data[key] = resource
+		data[key] = resource
 	}
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
+	k.data = data
 	k.dumpRequired = true
 }
 
@@ -101,9 +114,9 @@ func (k *Store) AddResource(obj interface{}) {
 	key := resourceKey(obj)
 	newObj := k.resourceCtor(obj, k.ctorConfig)
 	logrus.Tracef("%s added: %s", k.resourceType, key)
-	k.dataMutex.Lock()
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
 	k.data[key] = newObj
-	k.dataMutex.Unlock()
 	k.dumpRequired = true
 }
 
@@ -121,9 +134,9 @@ func (k *Store) DeleteResource(obj interface{}) {
 		return
 	}
 	logrus.Tracef("%s deleted: %s", k.resourceType, key)
-	k.dataMutex.Lock()
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
 	delete(k.data, key)
-	k.dataMutex.Unlock()
 	k.dumpRequired = true
 }
 
@@ -131,18 +144,22 @@ func (k *Store) DeleteResource(obj interface{}) {
 func (k *Store) UpdateResource(oldObj, newObj interface{}) {
 	key := resourceKey(newObj)
 	k8sObj := k.resourceCtor(newObj, k.ctorConfig)
-	k.dataMutex.Lock()
-	if k8sObj.HasChanged(k.data[key]) {
-		logrus.Tracef("%s changed: %s", k.resourceType, key)
-		k.data[key] = k8sObj
-		k.dataMutex.Unlock()
-		k.dumpRequired = true
-	} else {
-		k.dataMutex.Unlock()
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
+	// An update for a resource the store has never seen is a change by
+	// definition. Asking HasChanged is not an option: most implementations
+	// type-assert their argument and panic on the nil held for a missing key.
+	if old, ok := k.data[key]; ok && !k8sObj.HasChanged(old) {
+		return
 	}
+	logrus.Tracef("%s changed: %s", k.resourceType, key)
+	k.data[key] = k8sObj
+	k.dumpRequired = true
 }
 
 func (k *Store) GetStats() *Stats {
+	k.mutex.RLock()
+	defer k.mutex.RUnlock()
 	itemPerNamespaces := make(map[string]int, 0)
 	for _, r := range k.data {
 		namespace := r.GetNamespace()
@@ -162,6 +179,8 @@ func (k *Store) GetStats() *Stats {
 
 // DumpFullState writes the full state to the cache file
 func (k *Store) DumpFullState() error {
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
 	if !k.dumpRequired {
 		logrus.Tracef("No change of %s detected, skipping dump", k.resourceType)
 		return nil
@@ -176,8 +195,5 @@ func (k *Store) DumpFullState() error {
 	k.lastFullDump = now
 	logrus.Infof("Doing full dump of %d %s", len(k.data), k.resourceType)
 	destFile := k.storeConfig.GetResourceStorePath(k.resourceType)
-	k.dataMutex.Lock()
-	err := util.EncodeToFile(k.data, destFile)
-	k.dataMutex.Unlock()
-	return err
+	return util.EncodeToFile(k.data, destFile)
 }

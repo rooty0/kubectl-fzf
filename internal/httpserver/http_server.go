@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
@@ -19,8 +20,26 @@ type FzfHttpServer struct {
 	ResourceHit int
 	//LastModifiedHit int
 
+	storesMutex sync.RWMutex
 	stores      []*store.Store
 	storeConfig *store.StoreConfig
+}
+
+// SetStores replaces the stores used to build stats. It is called when the
+// watched cluster changes and the previous stores are discarded.
+func (f *FzfHttpServer) SetStores(stores []*store.Store) {
+	if f == nil {
+		return
+	}
+	f.storesMutex.Lock()
+	defer f.storesMutex.Unlock()
+	f.stores = stores
+}
+
+func (f *FzfHttpServer) getStores() []*store.Store {
+	f.storesMutex.RLock()
+	defer f.storesMutex.RUnlock()
+	return f.stores
 }
 
 type routeResourceFunc func(*gin.Context, resources.ResourceType)
@@ -36,7 +55,7 @@ func (f *FzfHttpServer) readinessRoute(c *gin.Context) {
 }
 
 func (f *FzfHttpServer) statsRoute(c *gin.Context) {
-	stats := store.GetStatsFromStores(f.stores)
+	stats := store.GetStatsFromStores(f.getStores())
 	logrus.Debugf("Sending stats: %v", stats)
 	c.JSON(http.StatusOK, stats)
 }

@@ -34,7 +34,11 @@ func getResourceCompletion(ctx context.Context, r resources.ResourceType, namesp
 		return nil, err
 	}
 	comps := []string{}
-	logrus.Debugf("Filterting with namespace %v", namespace)
+	if namespace == nil {
+		logrus.Debug("Filtering disabled, listing all namespaces")
+	} else {
+		logrus.Debugf("Filtering with namespace %s", *namespace)
+	}
 	for _, resource := range resources {
 		if namespace == nil || *namespace == resource.GetNamespace() {
 			comps = append(comps, resource.ToStrings()...)

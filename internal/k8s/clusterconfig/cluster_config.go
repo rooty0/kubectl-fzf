@@ -75,6 +75,9 @@ func (c *ClusterConfig) GetClientset() (*kubernetes.Clientset, error) {
 }
 
 func (c *ClusterConfig) GetNamespace() (string, error) {
+	if c.apiConfig == nil {
+		return "", errors.New("kubeconfig is not loaded, call LoadClusterConfig before")
+	}
 	contextStruct, ok := c.apiConfig.Contexts[c.apiConfig.CurrentContext]
 	if !ok {
 		return "", fmt.Errorf("context %s not found in config", c.apiConfig.CurrentContext)

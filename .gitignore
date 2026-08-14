@@ -127,6 +127,8 @@ fabric.properties
 .vscode/
 dist/
 kubeconfig
+# Credential-free kubeconfig fixtures the tests need
+!internal/**/testdata/kubeconfig
 TEMP.md
 tags
 TODO
