@@ -28,6 +28,79 @@ type cmdArg struct {
 	args []string
 }
 
+func TestParseRequest(t *testing.T) {
+	testDatas := []struct {
+		name               string
+		cmdArgs            []string
+		expectedWords      []string
+		expectedStructured bool
+	}{
+		{
+			name:          "legacy single string, as the bash plugin sends it",
+			cmdArgs:       []string{"get pods "},
+			expectedWords: []string{"get", "pods", " "},
+		},
+		{
+			name:               "words, one per argv entry",
+			cmdArgs:            []string{"--protocol=2", "--", "get", "pods", ""},
+			expectedWords:      []string{"get", "pods", " "},
+			expectedStructured: true,
+		},
+		{
+			// The whole point of the words protocol: a value holding a space is
+			// one word, which a single command line string cannot express.
+			name:               "a value holding a space stays one word",
+			cmdArgs:            []string{"--protocol=2", "--", "get", "pods", "-l", "app=my app"},
+			expectedWords:      []string{"get", "pods", "-l", "app=my app"},
+			expectedStructured: true,
+		},
+		{
+			// Only the first separator introduces the words, a later one is part
+			// of the command line itself.
+			name:               "a second separator belongs to the command line",
+			cmdArgs:            []string{"--protocol=2", "--", "exec", "mypod", "--", "sh", ""},
+			expectedWords:      []string{"exec", "mypod", "--", "sh", " "},
+			expectedStructured: true,
+		},
+		{
+			name:          "words without asking for the structured response",
+			cmdArgs:       []string{"--", "get", "pods", ""},
+			expectedWords: []string{"get", "pods", " "},
+		},
+		{
+			name:               "a word that is only being started",
+			cmdArgs:            []string{"--protocol=2", "--", "get", ""},
+			expectedWords:      []string{"get", " "},
+			expectedStructured: true,
+		},
+	}
+	for _, testData := range testDatas {
+		t.Run(testData.name, func(t *testing.T) {
+			request := ParseRequest(testData.cmdArgs)
+			require.NotNil(t, request)
+			assert.Equal(t, testData.expectedWords, request.Words)
+			assert.Equal(t, testData.expectedStructured, request.Structured)
+		})
+	}
+}
+
+func TestParseRequestWithNothingToComplete(t *testing.T) {
+	testDatas := []struct {
+		name    string
+		cmdArgs []string
+	}{
+		{"no arguments at all", []string{}},
+		{"only the protocol flag", []string{"--protocol=2"}},
+		{"a separator with no words behind it", []string{"--protocol=2", "--"}},
+		{"several strings, none of them words", []string{"get pods", "extra"}},
+	}
+	for _, testData := range testDatas {
+		t.Run(testData.name, func(t *testing.T) {
+			assert.Nil(t, ParseRequest(testData.cmdArgs))
+		})
+	}
+}
+
 func TestPrepareCmdArgs(t *testing.T) {
 	testDatas := []struct {
 		cmdArgs        []string

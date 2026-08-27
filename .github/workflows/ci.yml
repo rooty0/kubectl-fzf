@@ -28,3 +28,15 @@ jobs:
 
       - name: Test
         run: go test -race ./...
+
+  shell:
+    name: Zsh completion widget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
+      - name: Test the completion widget
+        run: zsh shell/kubectl_fzf_test.zsh

@@ -14,6 +14,72 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	// StructuredProtocolFlag asks for the key=value response instead of the bare
+	// completion string. It lets the shell be told about words it has to drop
+	// from the command line, which a single completion string cannot express.
+	StructuredProtocolFlag = "--protocol=2"
+
+	// WordsSeparator introduces the command line to complete, one word per argv
+	// entry. Handing the words over individually is what keeps a value holding a
+	// space, such as -l 'app=my app', in one piece.
+	WordsSeparator = "--"
+)
+
+// Request is what the shell asked for.
+type Request struct {
+	// Words is the command line to complete: the kubectl verb first, the word
+	// under the cursor last. A word that is only being started is a single space.
+	Words []string
+	// Structured asks for the key=value response.
+	Structured bool
+}
+
+// ParseRequest reads the arguments of the k8s_completion subcommand, and returns
+// nil when there is nothing to complete. That subcommand has flag parsing
+// disabled so the command line reaches us untouched, hence doing this by hand.
+func ParseRequest(cmdArgs []string) *Request {
+	request := &Request{}
+	if len(cmdArgs) > 0 && cmdArgs[0] == StructuredProtocolFlag {
+		request.Structured = true
+		cmdArgs = cmdArgs[1:]
+	}
+	request.Words = parseWords(cmdArgs)
+	if len(request.Words) == 0 {
+		return nil
+	}
+	return request
+}
+
+func parseWords(cmdArgs []string) []string {
+	// The first separator introduces the words: a later one belongs to the
+	// command line itself, as in "kubectl exec pod -- sh".
+	for i, arg := range cmdArgs {
+		if arg == WordsSeparator {
+			return prepareCmdWords(cmdArgs[i+1:])
+		}
+	}
+	return PrepareCmdArgs(cmdArgs)
+}
+
+// prepareCmdWords normalises words handed over one argv entry each. An empty last
+// word means a fresh word is being started, which the rest of the code has
+// always represented as a single space.
+func prepareCmdWords(words []string) []string {
+	if len(words) == 0 {
+		return nil
+	}
+	args := make([]string, len(words))
+	copy(args, words)
+	if last := len(args) - 1; args[last] == "" {
+		args[last] = " "
+	}
+	return args
+}
+
+// PrepareCmdArgs splits a command line that arrived as a single string, which is
+// what the bash plugin sends. Word boundaries are guessed here, so a quoted value
+// holding a space does not survive; the words protocol above avoids that.
 func PrepareCmdArgs(cmdArgs []string) []string {
 	if len(cmdArgs) != 1 {
 		return nil

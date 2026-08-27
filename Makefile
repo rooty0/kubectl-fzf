@@ -33,6 +33,10 @@ docker-minikube:
 test:
 	go test ./...
 
+# Kept out of `test` so a machine without zsh can still run the Go suite.
+test-shell:
+	zsh shell/kubectl_fzf_test.zsh
+
 snapshot:
 	GO_VERSION="$(shell go version)" goreleaser release --snapshot --rm-dist
 

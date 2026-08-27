@@ -13,15 +13,26 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// Result is what the shell has to apply to the command line.
+type Result struct {
+	// Completion replaces the word being completed.
+	Completion string
+	// RemoveWords lists arguments the shell must delete from the command line
+	// because they contradict the completion. Selecting a single object pins a
+	// namespace, and kubectl refuses to retrieve a resource by name across all
+	// namespaces, so -A cannot survive.
+	RemoveWords []string
+}
+
 // ProcessResult handles fzf output and provides completion to use
 // The fzfResult should have the first 3 columns of the fzf preview
 func ProcessResult(cmdUse string, cmdArgs []string,
-	f *fetcher.Fetcher, fzfResult string) (string, error) {
+	f *fetcher.Fetcher, fzfResult string) (*Result, error) {
 	logrus.Debugf("Processing fzf result %s", fzfResult)
 	logrus.Debugf("Cmd command %s", cmdArgs)
 	namespace, err := f.GetNamespace()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	return processResultWithNamespace(cmdUse, cmdArgs, fzfResult, namespace)
 }
@@ -35,7 +46,7 @@ func parseNamespaceFlag(cmdArgs []string) (*string, error) {
 	return cmdNamespace, err
 }
 
-func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult string, currentNamespace string) (string, error) {
+func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult string, currentNamespace string) (*Result, error) {
 	// If apiresource:
 	// 0 -> fullname, 1 -> shortname, 2 -> groupversion
 	// If namespaceless resource:
@@ -44,17 +55,28 @@ func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult strin
 	// 0 -> namespace, 1 -> value
 	resultFields := strings.Fields(fzfResult)
 	if len(resultFields) < 2 {
-		return "", fmt.Errorf("fzf result should have at least 3 elements, got %v", resultFields)
+		return nil, fmt.Errorf("fzf result should have at least 3 elements, got %v", resultFields)
 	}
 	logrus.Debugf("Processing fzfResult '%s', cmdArgs '%s', current namespace '%s'", fzfResult, cmdArgs, currentNamespace)
 	resourceType, flagCompletion, err := parse.ParseFlagAndResources(cmdUse, cmdArgs)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	logrus.Debugf("Resource type %s, flagCompletion %s", resourceType, flagCompletion)
 
 	if resourceType == resources.ResourceTypeApiResource {
-		return resultFields[0], nil
+		return &Result{Completion: resultFields[0]}, nil
+	}
+
+	// -A only ever selects what fzf lists. A selector value stays valid cluster
+	// wide, so -A is kept and the namespace suffix dropped, since -A silently
+	// overrides -n. Anything naming a single object pins a namespace, so -A goes.
+	allNamespacesFlags := parse.AllNamespacesFlags(cmdArgs)
+	selectorCompletion := flagCompletion == parse.FlagLabel || flagCompletion == parse.FlagFieldSelector
+	keepAllNamespaces := len(allNamespacesFlags) > 0 && selectorCompletion
+	var removeWords []string
+	if len(allNamespacesFlags) > 0 && !keepAllNamespaces {
+		removeWords = allNamespacesFlags
 	}
 
 	// Generic resource
@@ -75,7 +97,7 @@ func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult strin
 	if flagCompletion != parse.FlagNamespace {
 		cmdNamespace, err = parseNamespaceFlag(cmdArgs)
 		if err != nil {
-			return "", errors.Wrapf(err, "Error parsing commands %s", cmdArgs)
+			return nil, errors.Wrapf(err, "Error parsing commands %s", cmdArgs)
 		}
 		logrus.Debugf("Namespace parsed: %s", *cmdNamespace)
 	}
@@ -87,12 +109,12 @@ func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult strin
 	}
 
 	if cmdNamespace != nil && *cmdNamespace == resultNamespace {
-		return resultValue, nil
+		return &Result{Completion: resultValue, RemoveWords: removeWords}, nil
 	}
 
-	if resultNamespace != currentNamespace && flagCompletion != parse.FlagNamespace {
+	if resultNamespace != currentNamespace && flagCompletion != parse.FlagNamespace && !keepAllNamespaces {
 		completion := fmt.Sprintf("%s -n %s", resultValue, resultNamespace)
-		return completion, nil
+		return &Result{Completion: completion, RemoveWords: removeWords}, nil
 	}
-	return resultValue, nil
+	return &Result{Completion: resultValue, RemoveWords: removeWords}, nil
 }

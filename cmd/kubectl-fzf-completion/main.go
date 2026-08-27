@@ -47,10 +47,11 @@ func versionFun(cmd *cobra.Command, args []string) {
 }
 
 func completeFun(cmd *cobra.Command, cmdArgs []string) {
-	args := completion.PrepareCmdArgs(cmdArgs)
-	if args == nil {
+	request := completion.ParseRequest(cmdArgs)
+	if request == nil {
 		os.Exit(FallbackExitCode)
 	}
+	args := request.Words
 
 	firstWord := args[0]
 	verbs := []string{"get", "exec", "logs", "label", "describe", "delete", "annotate", "edit", "scale"}
@@ -108,7 +109,14 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 	if err != nil {
 		logrus.Fatalf("Process result error: %s", err)
 	}
-	fmt.Print(res)
+	if !request.Structured {
+		fmt.Print(res.Completion)
+		return
+	}
+	fmt.Printf("completion=%s\n", res.Completion)
+	for _, word := range res.RemoveWords {
+		fmt.Printf("remove-word=%s\n", word)
+	}
 }
 
 func statsFun(cmd *cobra.Command, args []string) {
