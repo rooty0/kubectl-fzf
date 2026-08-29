@@ -14,26 +14,26 @@ import (
 	"k8s.io/client-go/transport/spdy"
 )
 
-type PortForwardRequest struct {
+type Request struct {
 	podName      string
 	podNamespace string
 	localPort    int
 	podPort      int
 }
 
-func (p *PortForwardRequest) getPort() []string {
+func (p *Request) getPort() []string {
 	return []string{fmt.Sprintf("%d:%d", p.localPort, p.podPort)}
 }
 
-func (p *PortForwardRequest) getPath() string {
+func (p *Request) getPath() string {
 	return fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", p.podNamespace, p.podName)
 }
 
-func NewPortForwardRequest(podName, podNamespace string, localPort, podPort int) PortForwardRequest {
-	return PortForwardRequest{podName, podNamespace, localPort, podPort}
+func New(podName, podNamespace string, localPort, podPort int) Request {
+	return Request{podName, podNamespace, localPort, podPort}
 }
 
-func OpenPortForward(config *restclient.Config, p PortForwardRequest, readyChan, stopChan chan struct{}) error {
+func Open(config *restclient.Config, p Request, readyChan, stopChan chan struct{}) error {
 	address := []string{"localhost"}
 	ports := p.getPort()
 	path := p.getPath()

@@ -88,7 +88,7 @@ func (f *Fetcher) getKubectlFzfPod(ctx context.Context) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func (f *Fetcher) getPortForwardRequest(ctx context.Context) (portForwardRequest portforward.PortForwardRequest, err error) {
+func (f *Fetcher) getPortForwardRequest(ctx context.Context) (portForwardRequest portforward.Request, err error) {
 	pod, err := f.getKubectlFzfPod(ctx)
 	if err != nil {
 		return
@@ -103,7 +103,7 @@ func (f *Fetcher) getPortForwardRequest(ctx context.Context) (portForwardRequest
 		err = fmt.Errorf("container port invalid, should be > 0, got %d", podPort)
 		return
 	}
-	portForwardRequest = portforward.NewPortForwardRequest(pod.Name, pod.Namespace, f.portForwardLocalPort, podPort)
+	portForwardRequest = portforward.New(pod.Name, pod.Namespace, f.portForwardLocalPort, podPort)
 	logrus.Infof("Found a kubectl-fzf pod found, trying port-forward to %s", pod.Name)
 	return
 }
@@ -121,7 +121,7 @@ func (f *Fetcher) openPortForward(ctx context.Context) (chan struct{}, error) {
 		if err != nil {
 			errChan <- err
 		}
-		err = portforward.OpenPortForward(restConfig, portForwardRequest, readyChan, stopChan)
+		err = portforward.Open(restConfig, portForwardRequest, readyChan, stopChan)
 		if err != nil {
 			errChan <- err
 		}
