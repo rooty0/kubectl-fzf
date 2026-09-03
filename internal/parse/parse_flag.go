@@ -14,40 +14,25 @@ const (
 	FlagNamespace
 	FlagNone
 	FlagUnmanaged
+	FlagContext
+	FlagCluster
+	FlagUser
 )
 
 func (f FlagCompletion) String() string {
-	flagStr := [...]string{"Label", "FieldSelector", "Namespace", "None", "Unmanaged"}
-	if len(flagStr) < int(f) {
+	flagStr := [...]string{"Label", "FieldSelector", "Namespace", "None", "Unmanaged",
+		"Context", "Cluster", "User"}
+	if int(f) >= len(flagStr) {
 		return "Unknown"
 	}
 	return flagStr[f]
 }
 
-func parsePreviousFlag(s string) FlagCompletion {
-	logrus.Debugf("Parsing previous flag '%s'", s)
-	switch s {
-	case "-l":
-		return FlagLabel
-	case "--selector":
-		return FlagLabel
-	case "--field-selector":
-		return FlagFieldSelector
-	case "-n":
-		fallthrough
-	case "--namespace":
-		return FlagNamespace
-
-	case "--filename":
-		fallthrough
-	case "-f":
-		return FlagUnmanaged
-	case "--output":
-		fallthrough
-	case "-o":
-		return FlagUnmanaged
-	}
-	return FlagNone
+// IsKubeconfig reports whether the value being completed is named by the
+// kubeconfig rather than held in a cluster, which means it needs no cache and no
+// request to answer.
+func (f FlagCompletion) IsKubeconfig() bool {
+	return f == FlagContext || f == FlagCluster || f == FlagUser
 }
 
 func parseLastFlag(s string) FlagCompletion {
@@ -71,7 +56,11 @@ func parseLastFlag(s string) FlagCompletion {
 	return FlagUnmanaged
 }
 
-func CheckFlagManaged(args []string) FlagCompletion {
+// CheckFlagManaged says whether kubectl-fzf owns the completion of the last
+// word of args, and if so what that word completes to. cmdVerb is the kubectl
+// command being completed, needed because a short flag such as -f or -p means
+// different things from one command to the next.
+func CheckFlagManaged(cmdVerb string, args []string) FlagCompletion {
 	logrus.Infof("Checking Managed Flag '%s'", args)
 	if len(args) == 0 {
 		return FlagNone
@@ -88,7 +77,7 @@ func CheckFlagManaged(args []string) FlagCompletion {
 	if len(args) >= 2 {
 		penultimateArg := args[len(args)-2]
 		if strings.HasPrefix(penultimateArg, "-") {
-			return parsePreviousFlag(penultimateArg)
+			return previousFlagCompletion(cmdVerb, penultimateArg)
 		}
 	}
 	return FlagNone

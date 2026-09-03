@@ -68,6 +68,12 @@ func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult strin
 		return &Result{Completion: resultFields[0]}, nil
 	}
 
+	// A kubeconfig value is the name in the first column, and it pins no
+	// namespace: there is nothing to suffix and nothing to drop.
+	if flagCompletion.IsKubeconfig() {
+		return &Result{Completion: resultFields[0]}, nil
+	}
+
 	// -A only ever selects what fzf lists. A selector value stays valid cluster
 	// wide, so -A is kept and the namespace suffix dropped, since -A silently
 	// overrides -n. Anything naming a single object pins a namespace, so -A goes.

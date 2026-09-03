@@ -167,6 +167,14 @@ func processCommandArgsWithFetchConfig(
 
 	completionResult := &CompletionResult{Cluster: fetchConfig.GetContext()}
 
+	// 2. Values the kubeconfig names itself, such as --context. They are known
+	// without a cluster, so this comes before anything namespace related.
+	if flagCompletion.IsKubeconfig() {
+		completionResult.Header, completionResult.Completions, err =
+			kubeconfigCompletion(flagCompletion, fetchConfig)
+		return completionResult, err
+	}
+
 	// Figure out which namespace to use for completion:
 	// 1) -n/--namespace wins
 	// 2) -A/--all-namespaces → no filtering (all namespaces)

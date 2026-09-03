@@ -15,7 +15,7 @@ func (u UnmanagedFlagError) Error() string {
 
 func ParseFlagAndResources(cmdVerb string, cmdArgs []string) (resourceType resources.ResourceType, flagCompletion FlagCompletion, err error) {
 	resourceType = resources.ResourceTypeUnknown
-	flagCompletion = CheckFlagManaged(cmdArgs)
+	flagCompletion = CheckFlagManaged(cmdVerb, cmdArgs)
 	if flagCompletion == FlagUnmanaged {
 		logrus.Infof("Flag is unmanaged in %s, bailing out", cmdArgs)
 		err = UnmanagedFlagError(strings.Join(cmdArgs, " "))
@@ -25,6 +25,11 @@ func ParseFlagAndResources(cmdVerb string, cmdArgs []string) (resourceType resou
 
 	if flagCompletion == FlagNamespace {
 		resourceType = resources.ResourceTypeNamespace
+		return
+	}
+	// A kubeconfig value names no resource, so resource detection would only
+	// find whatever the verb happens to mention and then be ignored.
+	if flagCompletion.IsKubeconfig() {
 		return
 	}
 	resourceType = resources.GetResourceType(cmdVerb, cmdArgs)

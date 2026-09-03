@@ -42,6 +42,15 @@ export STUB_EXIT_FILE='$workDir/exit'
 KUBECTL_FZF_COMPLETION_BIN='$workDir/stub'
 cd '$workDir/empty'
 autoload -Uz compinit && compinit -u -d '$workDir/zcompdump'
+# A case can ask for a fallback it can watch. This binding is what the plugin
+# picks up as the previous Tab widget, and it records the call while leaving the
+# line alone. Without it the fallback lands on whatever completion the host has
+# for kubectl, which is not the same on a laptop as it is on CI.
+if [[ -n "\${KFZF_MARKER_FALLBACK:-}" ]]; then
+  __kfzf_marker_fallback() { print -r -- called >'$workDir/fallback' }
+  zle -N __kfzf_marker_fallback
+  bindkey '^I' __kfzf_marker_fallback
+fi
 source '$pluginDir/kubectl_fzf.plugin.zsh'
 # Reports the line the widget produced, so the checks never have to parse what
 # the terminal painted.
@@ -156,7 +165,13 @@ check_args()
   local description="$1" buffer="$2" expected="$3" got
   local -a gotArgs
   (( testCount++ ))
-  press_tab "$buffer" >/dev/null || { fail "$description" "harness failure"; return; }
+  # The reported line is of no interest here, and a case that ends in a fallback
+  # may open a listing that eats the reporting key.
+  press_tab "$buffer" 0 >/dev/null || { fail "$description" "harness failure"; return; }
+  if [[ ! -e "$workDir/args" ]]; then
+    fail "$description" "buffer: '$buffer'" "the completion binary was never called"
+    return
+  fi
   gotArgs=("${(@f)$(<"$workDir/args")}")
   got="${(pj: :)gotArgs}"
   if [[ "$got" == "$expected" ]]; then
@@ -164,6 +179,36 @@ check_args()
   else
     fail "$description" "expected argv: '$expected'" "got argv:      '$got'"
   fi
+}
+
+# check_fallback <description> <buffer>: the binary declined the position, so the
+# widget has to hand the line to the completion that held Tab before it, and hand
+# it over exactly as typed.
+check_fallback()
+{
+  local description="$1" buffer="$2" got
+  local -i harnessRc
+  (( testCount++ ))
+  rm -f "$workDir/fallback"
+  export KFZF_MARKER_FALLBACK=1
+  got=$(press_tab "$buffer")
+  harnessRc=$?
+  unset KFZF_MARKER_FALLBACK
+  if (( harnessRc )); then
+    fail "$description" "$got"
+    return
+  fi
+  if [[ ! -e "$workDir/fallback" ]]; then
+    fail "$description" "buffer: '$buffer'" \
+      "the widget never reached the previous Tab completion"
+    return
+  fi
+  if [[ "$got" != "$buffer" ]]; then
+    fail "$description" "the line was altered on the way to the fallback" \
+      "expected: '$buffer'" "got:      '$got'"
+    return
+  fi
+  print -r -- "ok   $description"
 }
 
 respond()
@@ -267,6 +312,61 @@ respond_exit 6
 check_line "exit code 6 leaves the line to the default completion" \
   "kubectl get frobnicate " \
   "kubectl get frobnicate "
+
+# The value of a flag whose candidates kubectl-fzf has no idea about, --sort-by
+# for instance, belongs to kubectl's own completion. What the shell has to get
+# right is handing that position over untouched.
+respond_exit 6
+check_fallback "a declined flag value goes to the shell's own completion" \
+  "kubectl get pods --sort-by "
+
+# Finding nothing is a different refusal, and it has to end up in the same place.
+respond_exit 5
+check_fallback "finding nothing hands the line over the same way" \
+  "kubectl get pods "
+
+respond_exit 6
+check_fallback "a declined value after a pipe keeps the prefix" \
+  "cat f.yaml | kubectl get pods --sort-by "
+
+# Which side owns the position is decided in the binary, from the flag name, so
+# the flag and the word being started both have to arrive intact. --context used
+# to be read as a boolean here, which offered a pod list for a context name.
+respond "completion=prod"
+check_args "the flag governing the position is reported with it" \
+  "kubectl get pods -n kube-system --context " \
+  "[k8s_completion] [--protocol=2] [--] [get] [pods] [-n] [kube-system] [--context] []"
+
+# Completing the flag itself is not completing its value, and kubectl knows the
+# flag names.
+respond_exit 6
+check_args "the attached form arrives whole" \
+  "kubectl get pods --context=" \
+  "[k8s_completion] [--protocol=2] [--] [get] [pods] [--context=]"
+
+# A context is named by the kubeconfig, so it comes back as a bare name: no
+# namespace is pinned by picking one, and nothing on the line contradicts it.
+respond "completion=prod"
+check_line "a context is completed from the kubeconfig" \
+  "kubectl get pods --context " \
+  "kubectl get pods --context prod "
+
+respond "completion=prod"
+check_line "the namespace the user typed survives the context they pick" \
+  "kubectl get pods -n kube-system --context " \
+  "kubectl get pods -n kube-system --context prod "
+
+# A flag that stands alone leaves a resource position behind it, so that one is
+# still ours: the two cases part company on the flag name alone.
+respond "completion=mypod -n web" "remove-word=-A"
+check_line "a boolean flag still completes a resource" \
+  "kubectl get pods -A " \
+  "kubectl get pods mypod -n web "
+
+respond "completion=mypod"
+check_line "a value already given leaves the next word to us" \
+  "kubectl get pods --context minikube " \
+  "kubectl get pods --context minikube mypod "
 
 # Splitting the line needs no terminal, so it is checked directly.
 source "$pluginDir/kubectl_fzf.plugin.zsh" 2>/dev/null

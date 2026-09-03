@@ -56,4 +56,3 @@ func GetTestPodStore(t *testing.T) (string, *store.Store) {
 	}
 	return tempDir, k8sStore
 }
-

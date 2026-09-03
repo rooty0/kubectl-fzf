@@ -86,6 +86,20 @@ func TestResult(t *testing.T) {
 		// Choosing a namespace explicitly contradicts -A, so -A goes.
 		{"web 30d kubernetes.io/metadata.name=web", "get", []string{"pods", "-A", "-n", " "}, "default",
 			"web", []string{"-A"}},
+		// A kubeconfig value is the name in the first column. The columns beside
+		// it are there to be read, not to be written to the command line, and no
+		// namespace is pinned so nothing is suffixed.
+		{"prod prod prod-ns prod-token", "get", []string{"pods", "--context", " "}, "default", "prod", nil},
+		{"staging https://staging.example.com", "get", []string{"pods", "--cluster", " "}, "default",
+			"staging", nil},
+		{"staging-user token", "get", []string{"pods", "--user", " "}, "default", "staging-user", nil},
+		// The namespace the user asked for survives the context they pick: it is
+		// what they typed, and it is why they are switching context.
+		{"prod prod prod-ns prod-token", "get",
+			[]string{"pods", "-n", "kube-system", "--context", " "}, "default", "prod", nil},
+		// -A says nothing about a context, so it stays too.
+		{"prod prod prod-ns prod-token", "get", []string{"pods", "-A", "--context", " "}, "default",
+			"prod", nil},
 	}
 	for _, testData := range testDatas {
 		res, err := processResultWithNamespace(testData.cmdUse, testData.cmdArgs, testData.fzfResult, testData.currentNamespace)
