@@ -102,7 +102,7 @@ func TestResult(t *testing.T) {
 			"prod", nil},
 	}
 	for _, testData := range testDatas {
-		res, err := processResultWithNamespace(testData.cmdUse, testData.cmdArgs, testData.fzfResult, testData.currentNamespace)
+		res, err := processResultWithNamespace(testData.cmdUse, testData.cmdArgs, -1, testData.fzfResult, testData.currentNamespace)
 		require.NoError(t, err)
 		require.Equal(t, testData.expectedResult, res.Completion,
 			"Fzf result %s, cmdUse %s, cmdArgs %s, current namespace %s, res: %s", testData.fzfResult, testData.cmdUse,
@@ -110,5 +110,56 @@ func TestResult(t *testing.T) {
 		require.Equal(t, testData.expectedRemovals, res.RemoveWords,
 			"Fzf result %s, cmdUse %s, cmdArgs %s, current namespace %s", testData.fzfResult, testData.cmdUse,
 			testData.cmdArgs, testData.currentNamespace)
+	}
+}
+
+// Words to the right of the cursor say what the line is about without being what
+// is completed, so the same words mean different things depending on where the
+// cursor sits.
+func TestResultWithCursorLeftOfTheLastWord(t *testing.T) {
+	testDatas := []struct {
+		name             string
+		fzfResult        string
+		cmdArgs          []string
+		cursor           int
+		currentNamespace string
+		expectedResult   string
+		expectedRemovals []string
+	}{
+		{
+			// The line already carries the namespace, so nothing is suffixed.
+			name:      "a pod completed in front of its namespace flag",
+			fzfResult: "kube-system coredns-64897985d-nrblm",
+			cmdArgs:   []string{"pods", " ", "-n", "kube-system"}, cursor: 1,
+			currentNamespace: "default",
+			expectedResult:   "coredns-64897985d-nrblm",
+		},
+		{
+			// The reported line, "k get sca<TAB> -n kube-system". The cursor is on the
+			// resource type, and the flag behind it must not make this a namespace.
+			name:      "a resource type completed in front of a namespace flag",
+			fzfResult: "scaledobjects.keda.sh None keda.sh/v1alpha1",
+			cmdArgs:   []string{"sca", "-n", "kube-system"}, cursor: 0,
+			currentNamespace: "default",
+			expectedResult:   "scaledobjects.keda.sh",
+		},
+		{
+			// Removals are found anywhere on the line, not only behind the cursor.
+			name:      "-A dropped from in front of the cursor",
+			fzfResult: "web web-server-1",
+			cmdArgs:   []string{"pods", "-A", " ", "-o", "yaml"}, cursor: 2,
+			currentNamespace: "default",
+			expectedResult:   "web-server-1 -n web",
+			expectedRemovals: []string{"-A"},
+		},
+	}
+	for _, testData := range testDatas {
+		t.Run(testData.name, func(t *testing.T) {
+			res, err := processResultWithNamespace("get", testData.cmdArgs, testData.cursor,
+				testData.fzfResult, testData.currentNamespace)
+			require.NoError(t, err)
+			assert.Equal(t, testData.expectedResult, res.Completion)
+			assert.Equal(t, testData.expectedRemovals, res.RemoveWords)
+		})
 	}
 }

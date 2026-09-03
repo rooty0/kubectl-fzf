@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
@@ -61,6 +62,17 @@ func (f *Fetcher) GetResources(ctx context.Context, r resources.ResourceType) (m
 	resources, err = f.checkRecentCache(r)
 	if resources != nil || err != nil {
 		return resources, err
+	}
+
+	// The http server and the port forward each answer for the context they were
+	// started in, and neither the url nor the pod lookup names one. Asking them
+	// about another context would quietly hand back another cluster's objects,
+	// which is the confusion an explicit --context is there to avoid. Nothing is
+	// better than something from the wrong cluster: the shell falls back to
+	// kubectl's own completion on this error.
+	if !f.IsCurrentContext() {
+		return nil, fmt.Errorf("no cached %s for context %s, and only the current context can be asked",
+			r, f.GetContext())
 	}
 
 	// Fetch remote

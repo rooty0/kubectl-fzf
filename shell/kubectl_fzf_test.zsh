@@ -42,6 +42,10 @@ export STUB_EXIT_FILE='$workDir/exit'
 KUBECTL_FZF_COMPLETION_BIN='$workDir/stub'
 cd '$workDir/empty'
 autoload -Uz compinit && compinit -u -d '$workDir/zcompdump'
+# zsh picks vi bindings when EDITOR names vi, and there ^B inserts itself rather
+# than moving the cursor. The keymap is pinned so the cases read the same on any
+# machine, and it is done before the bindings below, as -e resets them.
+bindkey -e
 # A case can ask for a fallback it can watch. This binding is what the plugin
 # picks up as the previous Tab widget, and it records the call while leaving the
 # line alone. Without it the fallback lands on whatever completion the host has
@@ -52,9 +56,12 @@ if [[ -n "\${KFZF_MARKER_FALLBACK:-}" ]]; then
   bindkey '^I' __kfzf_marker_fallback
 fi
 source '$pluginDir/kubectl_fzf.plugin.zsh'
-# Reports the line the widget produced, so the checks never have to parse what
-# the terminal painted.
-__report_buffer() { print -r -- "<<<\$BUFFER>>>" >'$workDir/buffer' }
+# Reports the line the widget produced, and where it left the cursor, so the
+# checks never have to parse what the terminal painted.
+__report_buffer() {
+  print -r -- "<<<\$BUFFER>>>" >'$workDir/buffer'
+  print -r -- "\$CURSOR" >'$workDir/cursor'
+}
 zle -N __report_buffer
 bindkey '^X^R' __report_buffer
 RC
@@ -81,15 +88,17 @@ wait_for()
   return 1
 }
 
-# press_tab <buffer> [reportNeeded]: types the buffer, presses Tab and prints the
-# resulting line. Cases that only look at how the binary was called pass a 0, as
-# the stock completion may open a listing that eats the reporting key.
+# press_tab <buffer> [reportNeeded] [leftMoves]: types the buffer, walks the
+# cursor back over leftMoves characters, presses Tab and prints the resulting
+# line. Cases that only look at how the binary was called pass a 0 for
+# reportNeeded, as the stock completion may open a listing that eats the
+# reporting key.
 press_tab()
 {
   local buffer="$1" out
-  local -i reportNeeded=${2:-1} waited=0
+  local -i reportNeeded=${2:-1} leftMoves=${3:-0} waited=0
 
-  rm -f "$workDir/buffer" "$workDir/args"
+  rm -f "$workDir/buffer" "$workDir/args" "$workDir/cursor"
   zpty -d kfzf 2>/dev/null
   # -d skips the global rc files: only the harness zshrc should shape the shell.
   zpty kfzf zsh -d -i
@@ -100,6 +109,11 @@ press_tab()
 
   zpty -w -n kfzf "$buffer"
   sleep 0.3
+  # ^B is backward-char, which the pty carries more reliably than an arrow key.
+  if (( leftMoves )); then
+    repeat leftMoves; do zpty -w -n kfzf $'\C-B'; done
+    sleep 0.3
+  fi
   zpty -w -n kfzf $'\t'
   sleep 1
   zpty -w -n kfzf $'\C-X\C-R'
@@ -141,6 +155,46 @@ check_line()
     print -r -- "ok   $description"
   else
     fail "$description" "buffer:   '$buffer'" "expected: '$expected'" "got:      '$got'"
+  fi
+}
+
+# check_line_at <description> <left of cursor> <right of cursor> <expected left>
+# <expected right>: the same, with the cursor left of the end of the line. Where
+# the cursor is left afterwards is checked too, since a completion that lands the
+# cursor in the wrong place is as bad as one that writes the wrong line.
+check_line_at()
+{
+  local description="$1" left="$2" right="$3" wantLeft="$4" wantRight="$5" got
+  local -i gotCursor
+  (( testCount++ ))
+  got=$(press_tab "$left$right" 1 ${#right}) || { fail "$description" "$got"; return; }
+  gotCursor=$(<"$workDir/cursor")
+  if [[ "$got" == "$wantLeft$wantRight" ]] && (( gotCursor == ${#wantLeft} )); then
+    print -r -- "ok   $description"
+  else
+    fail "$description" "typed:    '$left<cursor>$right'" \
+      "expected: '$wantLeft<cursor>$wantRight'" \
+      "got:      '${got[1,gotCursor]}<cursor>${got[gotCursor+1,-1]}'"
+  fi
+}
+
+# check_args_at <description> <left of cursor> <right of cursor> <expected argv>
+check_args_at()
+{
+  local description="$1" left="$2" right="$3" expected="$4" got
+  local -a gotArgs
+  (( testCount++ ))
+  press_tab "$left$right" 0 ${#right} >/dev/null || { fail "$description" "harness failure"; return; }
+  if [[ ! -e "$workDir/args" ]]; then
+    fail "$description" "line: '$left<cursor>$right'" "the completion binary was never called"
+    return
+  fi
+  gotArgs=("${(@f)$(<"$workDir/args")}")
+  got="${(pj: :)gotArgs}"
+  if [[ "$got" == "$expected" ]]; then
+    print -r -- "ok   $description"
+  else
+    fail "$description" "expected argv: '$expected'" "got argv:      '$got'"
   fi
 }
 
@@ -254,14 +308,14 @@ check_line "only the reported word is dropped" \
 respond "completion=mypod -n web"
 check_args "the words are handed over one argv entry each" \
   "kubectl get pods -A " \
-  "[k8s_completion] [--protocol=2] [--] [get] [pods] [-A] []"
+  "[k8s_completion] [--protocol=2] [--cursor=3] [--] [get] [pods] [-A] []"
 
 # The point of the words protocol: a quoted value keeps its space and arrives as
 # one argument, with the quoting stripped the way kubectl would see it.
 respond "completion=mypod -n web"
 check_args "a quoted value holding a space stays one argument" \
   "kubectl get pods -l \"app=my app\" " \
-  "[k8s_completion] [--protocol=2] [--] [get] [pods] [-l] [app=my app] []"
+  "[k8s_completion] [--protocol=2] [--cursor=4] [--] [get] [pods] [-l] [app=my app] []"
 
 # ... and the line keeps the quotes the user typed.
 respond "completion=mypod -n web"
@@ -283,7 +337,7 @@ check_line "spacing before the pipe is not reflowed" \
 respond "completion=mypod -n web"
 check_args "only the last command is sent to the binary" \
   "cat f.yaml | kubectl get pods " \
-  "[k8s_completion] [--protocol=2] [--] [get] [pods] []"
+  "[k8s_completion] [--protocol=2] [--cursor=2] [--] [get] [pods] []"
 
 # A command that is not kubectl is none of our business, whatever precedes it.
 respond "completion=should-not-be-used"
@@ -335,14 +389,14 @@ check_fallback "a declined value after a pipe keeps the prefix" \
 respond "completion=prod"
 check_args "the flag governing the position is reported with it" \
   "kubectl get pods -n kube-system --context " \
-  "[k8s_completion] [--protocol=2] [--] [get] [pods] [-n] [kube-system] [--context] []"
+  "[k8s_completion] [--protocol=2] [--cursor=5] [--] [get] [pods] [-n] [kube-system] [--context] []"
 
 # Completing the flag itself is not completing its value, and kubectl knows the
 # flag names.
 respond_exit 6
 check_args "the attached form arrives whole" \
   "kubectl get pods --context=" \
-  "[k8s_completion] [--protocol=2] [--] [get] [pods] [--context=]"
+  "[k8s_completion] [--protocol=2] [--cursor=2] [--] [get] [pods] [--context=]"
 
 # A context is named by the kubeconfig, so it comes back as a bare name: no
 # namespace is pinned by picking one, and nothing on the line contradicts it.
@@ -368,46 +422,52 @@ check_line "a value already given leaves the next word to us" \
   "kubectl get pods --context minikube " \
   "kubectl get pods --context minikube mypod "
 
-# Splitting the line needs no terminal, so it is checked directly.
-source "$pluginDir/kubectl_fzf.plugin.zsh" 2>/dev/null
+# A command is completed wherever the cursor happens to be, not only at the end
+# of the line. Reading the line is zsh's own job here, so a word behind the
+# cursor is context rather than a reason to give up.
+respond "completion=scaledobjects.keda.sh"
+check_line_at "a resource type is completed in front of a namespace flag" \
+  "kubectl get sca" " -n kube-system" \
+  "kubectl get scaledobjects.keda.sh" " -n kube-system"
 
-# check_split <buffer> <expected prefix> <expected command>
-check_split()
-{
-  local buffer="$1" wantPrefix="$2" wantCommand="$3"
-  local commandPrefix commandLine
-  (( testCount++ ))
-  __kubectl_fzf_split_last_command "$buffer"
-  if [[ "$commandPrefix" != "$wantPrefix" || "$commandLine" != "$wantCommand" ]]; then
-    fail "split of '$buffer'" \
-      "expected prefix '$wantPrefix' and command '$wantCommand'" \
-      "got      prefix '$commandPrefix' and command '$commandLine'"
-    return
-  fi
-  # Whatever the split decides, the two halves have to be the original line.
-  if [[ "${commandPrefix}${commandLine}" != "$buffer" ]]; then
-    fail "split of '$buffer' does not reassemble into the original line"
-    return
-  fi
-  print -r -- "ok   split of '$buffer'"
-}
+respond "completion=scaledobjects.keda.sh"
+check_args_at "the words behind the cursor are sent, and the cursor with them" \
+  "kubectl get sca" " -n kube-system" \
+  "[k8s_completion] [--protocol=2] [--cursor=1] [--] [get] [sca] [-n] [kube-system]"
 
-check_split 'kubectl get pods ' '' 'kubectl get pods '
-check_split 'k get pods -oyaml|gre' 'k get pods -oyaml|' 'gre'
-check_split 'cat f.yaml | k apply -f ' 'cat f.yaml | ' 'k apply -f '
-check_split 'cat f.yaml |k get pods ' 'cat f.yaml |' 'k get pods '
-check_split 'k get pods && k get svc ' 'k get pods && ' 'k get svc '
-check_split 'k get pods ; k get svc ' 'k get pods ; ' 'k get svc '
-check_split 'a|b|k get pods ' 'a|b|' 'k get pods '
-check_split 'k get pods > out.tx' 'k get pods > ' 'out.tx'
-check_split 'k get pods 2>/dev/null ' 'k get pods 2>' '/dev/null '
-check_split 'k get pods |' 'k get pods |' ''
-# An operator inside quotes is part of a value, not a command boundary.
-check_split 'k get pods -l "a|b" ' '' 'k get pods -l "a|b" '
-check_split "k get pods -l 'x;y' " '' "k get pods -l 'x;y' "
-# Spacing the user typed has to survive untouched.
-check_split 'k   get   pods ' '' 'k   get   pods '
-check_split '' '' ''
+respond "completion=coredns-64897985d-nrblm"
+check_line_at "the whole word under the cursor is replaced, not just its start" \
+  "kubectl get pods cor" "edns" \
+  "kubectl get pods coredns-64897985d-nrblm " ""
+
+respond "completion=coredns-1"
+check_line_at "a command after a pipe is completed in the middle of the line" \
+  "cat f.yaml |kubectl get pods cor" " -n kube-system" \
+  "cat f.yaml |kubectl get pods coredns-1" " -n kube-system"
+
+# Removing a word means writing the command out again, so the words behind the
+# cursor have to come through that intact.
+respond "completion=mypod -n web" "remove-word=-A"
+check_line_at "-A is dropped with the line continuing behind the cursor" \
+  "kubectl get pods -A " " -o yaml" \
+  "kubectl get pods mypod -n web" " -o yaml"
+
+respond "completion=mypod -n web" "remove-word=-A"
+check_line_at "a removal after a pipe keeps what came before it" \
+  "cat f.yaml | kubectl get pods -A " " -o yaml" \
+  "cat f.yaml | kubectl get pods mypod -n web" " -o yaml"
+
+# A cursor sitting against the next word is on that word, which is zsh's own
+# reading of the line and the one the user's other completions follow.
+respond "completion=mypod"
+check_line_at "the word the cursor abuts is the one completed" \
+  "kubectl get pods " "-o yaml" \
+  "kubectl get pods mypod" " yaml"
+
+# The verb belongs to kubectl's own completion, wherever the cursor sits.
+respond "completion=should-not-be-used"
+check_not_called "a verb being typed is left to the shell" \
+  "kubectl ge"
 
 # The Tab binding that was in place has to be remembered, otherwise sourcing the
 # plugin silently throws away a widget the user had set up. Also a load time

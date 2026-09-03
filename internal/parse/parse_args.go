@@ -41,6 +41,55 @@ func ParseFlagAndResources(cmdVerb string, cmdArgs []string) (resourceType resou
 	return
 }
 
+// WordsUpToCursor returns the words the completion is decided by: everything up
+// to and including the one under the cursor. A cursor outside the slice is taken
+// to be on the last word, which is where a shell that sends none leaves it.
+func WordsUpToCursor(args []string, cursor int) []string {
+	if cursor < 0 || cursor >= len(args) {
+		return args
+	}
+	return args[:cursor+1]
+}
+
+// WordsBesideCursor returns every word but the one under the cursor. That word
+// is being typed rather than meant, so nothing should be decided on it.
+func WordsBesideCursor(args []string, cursor int) []string {
+	if cursor < 0 || cursor >= len(args) {
+		return args
+	}
+	beside := make([]string, 0, len(args)-1)
+	beside = append(beside, args[:cursor]...)
+	return append(beside, args[cursor+1:]...)
+}
+
+// ParseContextFromArgs returns the context the command line names, which is the
+// cluster the completion is about whatever the kubeconfig calls current.
+// Scanning stops at "--" because everything past it is handed to the executed
+// command, so a "kubectl exec pod -- prog --context x" names none.
+func ParseContextFromArgs(args []string) *string {
+	for k, arg := range args {
+		if arg == "--" {
+			return nil
+		}
+		if value, found := strings.CutPrefix(arg, "--context="); found {
+			return contextName(value)
+		}
+		if arg == "--context" && len(args) > k+1 {
+			return contextName(args[k+1])
+		}
+	}
+	return nil
+}
+
+// contextName rejects what cannot be one: a word only being started, and a flag,
+// which is what stands where the value would be when the value is missing.
+func contextName(value string) *string {
+	if value == "" || value == " " || strings.HasPrefix(value, "-") {
+		return nil
+	}
+	return &value
+}
+
 func ParseNamespaceFromArgs(args []string) *string {
 	for k, arg := range args {
 		if (arg == "-n" || arg == "--namespace") && len(args) > k+1 && args[k+1] != " " {

@@ -17,7 +17,7 @@ func TestProcessContext(t *testing.T) {
 		{"get", []string{"pods", "-n", "kube-system", "--context", ""}},
 	}
 	for _, cmdArg := range cmdArgs {
-		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args)
+		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err, "args %s", cmdArg.args)
 		require.Equal(t, "Context\tCluster\tNamespace\tUser", completionResults.Header)
 		require.Equal(t, []string{
@@ -31,7 +31,7 @@ func TestProcessCluster(t *testing.T) {
 	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
 
 	completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig,
-		"get", []string{"pods", "--cluster", ""})
+		"get", []string{"pods", "--cluster", ""}, -1)
 
 	require.NoError(t, err)
 	require.Equal(t, "Cluster\tServer", completionResults.Header)
@@ -45,7 +45,7 @@ func TestProcessUser(t *testing.T) {
 	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
 
 	completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig,
-		"get", []string{"pods", "--user", ""})
+		"get", []string{"pods", "--user", ""}, -1)
 
 	require.NoError(t, err)
 	require.Equal(t, "User\tAuth", completionResults.Header)
@@ -59,7 +59,7 @@ func TestKubeconfigCompletionNeedsNoResource(t *testing.T) {
 	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
 
 	completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig,
-		"config", []string{"view", "--context", ""})
+		"config", []string{"view", "--context", ""}, -1)
 
 	require.NoError(t, err)
 	require.Len(t, completionResults.Completions, 2)

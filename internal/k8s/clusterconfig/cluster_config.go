@@ -47,6 +47,30 @@ func (c *ClusterConfig) LoadClusterConfig() (err error) {
 	return nil
 }
 
+// SetContext points the configuration at a context other than the one the
+// kubeconfig calls current, which is what a --context on the command line being
+// completed asks for. The cache holds one directory per context, so this is
+// mostly a matter of naming the right one.
+func (c *ClusterConfig) SetContext(contextName string) error {
+	if c.apiConfig == nil {
+		return errors.New("kubeconfig is not loaded, call LoadClusterConfig before")
+	}
+	if _, ok := c.apiConfig.Contexts[contextName]; !ok {
+		return fmt.Errorf("context %s not found in config", contextName)
+	}
+	c.clusterName = contextName
+	c.destDir = path.Join(c.cacheDir, c.clusterName)
+	logrus.Debugf("Cluster config set to target '%s'", c.destDir)
+	return nil
+}
+
+// IsCurrentContext reports whether the configuration still points at the context
+// the kubeconfig calls current. Anything that answers for the running kubectl,
+// rather than from the cache on disk, is only good for that one.
+func (c *ClusterConfig) IsCurrentContext() bool {
+	return c.apiConfig == nil || c.clusterName == c.apiConfig.CurrentContext
+}
+
 func (c *ClusterConfig) CreateDestDir() error {
 	if c.clusterName == "" {
 		return errors.New("clustername is empty, call LoadClusterConfig before")
@@ -78,9 +102,11 @@ func (c *ClusterConfig) GetNamespace() (string, error) {
 	if c.apiConfig == nil {
 		return "", errors.New("kubeconfig is not loaded, call LoadClusterConfig before")
 	}
-	contextStruct, ok := c.apiConfig.Contexts[c.apiConfig.CurrentContext]
+	// The context being completed for, which is the current one until a
+	// --context on the command line says otherwise.
+	contextStruct, ok := c.apiConfig.Contexts[c.clusterName]
 	if !ok {
-		return "", fmt.Errorf("context %s not found in config", c.apiConfig.CurrentContext)
+		return "", fmt.Errorf("context %s not found in config", c.clusterName)
 	}
 	return contextStruct.Namespace, nil
 }

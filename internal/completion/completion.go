@@ -3,6 +3,7 @@ package completion
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,13 +25,22 @@ const (
 	// entry. Handing the words over individually is what keeps a value holding a
 	// space, such as -l 'app=my app', in one piece.
 	WordsSeparator = "--"
+
+	// CursorFlagPrefix says which word is being completed. Without it the cursor
+	// is taken to be on the last word, which is where a shell that only sends the
+	// left half of the line leaves it.
+	CursorFlagPrefix = "--cursor="
 )
 
 // Request is what the shell asked for.
 type Request struct {
-	// Words is the command line to complete: the kubectl verb first, the word
-	// under the cursor last. A word that is only being started is a single space.
+	// Words is the command line to complete, the kubectl verb first. A word that
+	// is only being started is a single space.
 	Words []string
+	// Cursor indexes Words at the word being completed. The words after it are
+	// part of the request too: they say which namespace or context the line is
+	// about, even though they are not what is being completed.
+	Cursor int
 	// Structured asks for the key=value response.
 	Structured bool
 }
@@ -39,14 +49,39 @@ type Request struct {
 // nil when there is nothing to complete. That subcommand has flag parsing
 // disabled so the command line reaches us untouched, hence doing this by hand.
 func ParseRequest(cmdArgs []string) *Request {
-	request := &Request{}
-	if len(cmdArgs) > 0 && cmdArgs[0] == StructuredProtocolFlag {
-		request.Structured = true
+	request := &Request{Cursor: -1}
+	// Only the options in front of the words are ours. Past the separator every
+	// argument belongs to the command line, --context included.
+	for len(cmdArgs) > 0 && cmdArgs[0] != WordsSeparator && strings.HasPrefix(cmdArgs[0], "--") {
+		option := cmdArgs[0]
 		cmdArgs = cmdArgs[1:]
+		if option == StructuredProtocolFlag {
+			request.Structured = true
+			continue
+		}
+		value, isCursor := strings.CutPrefix(option, CursorFlagPrefix)
+		if !isCursor {
+			logrus.Warnf("Ignoring unknown completion option %s", option)
+			continue
+		}
+		cursor, err := strconv.Atoi(value)
+		if err != nil {
+			logrus.Warnf("Ignoring malformed %s: %s", option, err)
+			continue
+		}
+		request.Cursor = cursor
 	}
 	request.Words = parseWords(cmdArgs)
 	if len(request.Words) == 0 {
 		return nil
+	}
+	if request.Cursor < 0 || request.Cursor >= len(request.Words) {
+		request.Cursor = len(request.Words) - 1
+	}
+	// A word being started is empty, and the rest of the code has always known
+	// that state as a single space.
+	if request.Words[request.Cursor] == "" {
+		request.Words[request.Cursor] = " "
 	}
 	return request
 }
@@ -62,18 +97,14 @@ func parseWords(cmdArgs []string) []string {
 	return PrepareCmdArgs(cmdArgs)
 }
 
-// prepareCmdWords normalises words handed over one argv entry each. An empty last
-// word means a fresh word is being started, which the rest of the code has
-// always represented as a single space.
+// prepareCmdWords copies the words handed over one argv entry each, so that the
+// normalisation done afterwards does not write into the caller's slice.
 func prepareCmdWords(words []string) []string {
 	if len(words) == 0 {
 		return nil
 	}
 	args := make([]string, len(words))
 	copy(args, words)
-	if last := len(args) - 1; args[last] == "" {
-		args[last] = " "
-	}
 	return args
 }
 
@@ -136,11 +167,17 @@ func processCommandArgsWithFetchConfig(
 	fetchConfig *fetcher.Fetcher,
 	cmdVerb string,
 	args []string,
+	cursor int,
 ) (*CompletionResult, error) {
 	var err error
 
+	// What is being completed is decided by the words up to the cursor. Anything
+	// past it is context: a -n further right still says which namespace to list,
+	// but it is not the thing being completed.
+	completed := parse.WordsUpToCursor(args, cursor)
+
 	// 0. Special case: completing the value of -n / --namespace
-	if isNamespaceValueCompletion(args) {
+	if isNamespaceValueCompletion(completed) {
 		completionResult := &CompletionResult{
 			Cluster: fetchConfig.GetContext(),
 		}
@@ -159,7 +196,7 @@ func processCommandArgsWithFetchConfig(
 	}
 
 	// 1. Normal resource/flag completion flow
-	resourceType, flagCompletion, err := parse.ParseFlagAndResources(cmdVerb, args)
+	resourceType, flagCompletion, err := parse.ParseFlagAndResources(cmdVerb, completed)
 	if err != nil {
 		return nil, err
 	}
@@ -182,10 +219,12 @@ func processCommandArgsWithFetchConfig(
 	namespace := parse.ParseNamespaceFromArgs(args)
 	allNamespaces := parse.HasAllNamespacesFlag(args)
 
-	if allNamespaces {
-		// Explicitly, all namespaces: do not filter
+	if allNamespaces || !resourceType.IsNamespaced() {
+		// Explicitly all namespaces, or a resource type that lives in none. A
+		// cluster scoped object is in no namespace, so filtering on one would
+		// answer nothing at all.
 		namespace = nil
-	} else if namespace == nil && resourceType.IsNamespaced() {
+	} else if namespace == nil {
 		// Default to the current context's namespace for namespaced resources
 		if ns, err := fetchConfig.GetNamespace(); err == nil {
 			// kubeconfig can omit namespace to mean "default"
@@ -216,9 +255,9 @@ func processCommandArgsWithFetchConfig(
 	return completionResult, err
 }
 
-func ProcessCommandArgs(cmdVerb string, args []string, f *fetcher.Fetcher) (*CompletionResult, error) {
+func ProcessCommandArgs(cmdVerb string, args []string, cursor int, f *fetcher.Fetcher) (*CompletionResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	completionResult, err := processCommandArgsWithFetchConfig(ctx, f, cmdVerb, args)
+	completionResult, err := processCommandArgsWithFetchConfig(ctx, f, cmdVerb, args, cursor)
 	cancel()
 	return completionResult, err
 }

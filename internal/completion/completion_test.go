@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/bonnefoa/kubectl-fzf/v3/internal/fetcher/fetchertest"
@@ -84,6 +85,64 @@ func TestParseRequest(t *testing.T) {
 	}
 }
 
+func TestParseRequestCursor(t *testing.T) {
+	testDatas := []struct {
+		name           string
+		cmdArgs        []string
+		expectedWords  []string
+		expectedCursor int
+	}{
+		{
+			// The cursor is what tells the words being completed from the ones
+			// that only say what the line is about.
+			name:           "a cursor left of the last word",
+			cmdArgs:        []string{"--cursor=1", "--", "get", "sca", "-n", "kube-system"},
+			expectedWords:  []string{"get", "sca", "-n", "kube-system"},
+			expectedCursor: 1,
+		},
+		{
+			name:           "no cursor sent leaves it on the last word",
+			cmdArgs:        []string{"--", "get", "pods", "cor"},
+			expectedWords:  []string{"get", "pods", "cor"},
+			expectedCursor: 2,
+		},
+		{
+			name:           "a word being started under the cursor",
+			cmdArgs:        []string{"--cursor=2", "--", "get", "pods", "", "-n", "kube-system"},
+			expectedWords:  []string{"get", "pods", " ", "-n", "kube-system"},
+			expectedCursor: 2,
+		},
+		{
+			// A shell miscounting must not take the completion down with it.
+			name:           "a cursor past the last word falls back to it",
+			cmdArgs:        []string{"--cursor=9", "--", "get", "pods"},
+			expectedWords:  []string{"get", "pods"},
+			expectedCursor: 1,
+		},
+		{
+			name:           "a cursor that is not a number is ignored",
+			cmdArgs:        []string{"--cursor=x", "--", "get", "pods"},
+			expectedWords:  []string{"get", "pods"},
+			expectedCursor: 1,
+		},
+		{
+			// --context is a word of the command line, not an option of ours.
+			name:           "an option looking word past the separator",
+			cmdArgs:        []string{"--protocol=2", "--cursor=3", "--", "get", "pods", "--context", "prod"},
+			expectedWords:  []string{"get", "pods", "--context", "prod"},
+			expectedCursor: 3,
+		},
+	}
+	for _, testData := range testDatas {
+		t.Run(testData.name, func(t *testing.T) {
+			request := ParseRequest(testData.cmdArgs)
+			require.NotNil(t, request)
+			assert.Equal(t, testData.expectedWords, request.Words)
+			assert.Equal(t, testData.expectedCursor, request.Cursor)
+		})
+	}
+}
+
 func TestParseRequestWithNothingToComplete(t *testing.T) {
 	testDatas := []struct {
 		name    string
@@ -125,11 +184,78 @@ func TestProcessResourceName(t *testing.T) {
 		{"exec", []string{"-ti", ""}},
 	}
 	for _, cmdArg := range cmdArgs {
-		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args)
+		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err)
 		require.Greater(t, len(completionResults.Completions), 0)
 		require.Contains(t, completionResults.Completions[0], "kube-system\tcoredns-6d4b75cb6d-m6m4q\t172.17.0.3\t192.168.49.2\tminikube\tRunning\tBurstable\tcoredns\tCriticalAddonsOnly:,node-role.kubernetes.io/master:NoSchedule,node-role.kubernetes.io/control-plane:NoSchedule\tNone")
 	}
+}
+
+// A flag sitting to the right of the cursor still says which namespace the line
+// is about, but it is not the thing being completed: "get pods <TAB> -n kube-system"
+// asks for the pods of kube-system, not for a namespace.
+func TestProcessResourceWithFlagsAfterCursor(t *testing.T) {
+	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
+	testDatas := []struct {
+		name   string
+		args   []string
+		cursor int
+	}{
+		{"a word being started", []string{"pods", " ", "-n", "kube-system"}, 1},
+		{"a name being typed", []string{"pods", "cor", "-n", "kube-system"}, 1},
+		{"a flag further right still", []string{"pods", " ", "-n", "kube-system", "-o", "yaml"}, 1},
+	}
+	for _, testData := range testDatas {
+		t.Run(testData.name, func(t *testing.T) {
+			completionResults, err := processCommandArgsWithFetchConfig(context.Background(),
+				fetchConfig, "get", testData.args, testData.cursor)
+			require.NoError(t, err)
+			require.Greater(t, len(completionResults.Completions), 0)
+			assert.Equal(t, resources.ResourceToHeader(resources.ResourceTypePod), completionResults.Header)
+			for _, completion := range completionResults.Completions {
+				assert.True(t, strings.HasPrefix(completion, "kube-system\t"),
+					"completion %q should be filtered to the namespace named after the cursor", completion)
+			}
+		})
+	}
+}
+
+// A --context on the line asks about another cluster, so the answer comes from
+// that context's own cache directory.
+func TestProcessResourceOfAnotherContext(t *testing.T) {
+	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
+	require.NoError(t, fetchConfig.SetContext("staging"))
+
+	_, err := processCommandArgsWithFetchConfig(context.Background(),
+		fetchConfig, "get", []string{"pods", " "}, -1)
+
+	// staging has no cache, and the running kubectl-fzf server answers for the
+	// current context alone. Saying nothing sends the shell to kubectl's own
+	// completion; answering would mean minikube's pods under a staging heading.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "staging")
+}
+
+// The reported line, "k get sca<TAB> -n kube-system": the cursor is on the resource
+// type, so the resource types are what gets listed, and the flag behind it must
+// not turn the request into a namespace completion.
+func TestProcessResourceTypeWithFlagsAfterCursor(t *testing.T) {
+	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
+	completionResults, err := processCommandArgsWithFetchConfig(context.Background(),
+		fetchConfig, "get", []string{"sca", "-n", "kube-system"}, 0)
+	require.NoError(t, err)
+	require.Greater(t, len(completionResults.Completions), 0)
+	assert.Equal(t, resources.ResourceToHeader(resources.ResourceTypeApiResource), completionResults.Header)
+}
+
+// The same words with the cursor at the end are a namespace being completed, so
+// the cursor is what decides, not the words.
+func TestProcessNamespaceValueUnderTheCursor(t *testing.T) {
+	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
+	completionResults, err := processCommandArgsWithFetchConfig(context.Background(),
+		fetchConfig, "get", []string{"pods", "-n", "kube-system"}, 2)
+	require.NoError(t, err)
+	assert.Equal(t, resources.ResourceToHeader(resources.ResourceTypeNamespace), completionResults.Header)
 }
 
 func TestProcessNamespace(t *testing.T) {
@@ -142,7 +268,7 @@ func TestProcessNamespace(t *testing.T) {
 		{"logs", []string{"--namespace="}},
 	}
 	for _, cmdArg := range cmdArgs {
-		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args)
+		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err)
 		require.Greater(t, len(completionResults.Completions), 0)
 		require.Contains(t, completionResults.Completions[0], "default\t")
@@ -159,7 +285,7 @@ func TestProcessLabelCompletion(t *testing.T) {
 		{"get", []string{"pods", "--selector="}},
 	}
 	for _, cmdArg := range cmdArgs {
-		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args)
+		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err)
 		require.Equal(t, "kube-system\ttier=control-plane\t4", completionResults.Completions[0])
 		require.Len(t, completionResults.Completions, 12)
@@ -173,7 +299,7 @@ func TestProcessFieldSelectorCompletion(t *testing.T) {
 		{"get", []string{"pods", "--field-selector="}},
 	}
 	for _, cmdArg := range cmdArgs {
-		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args)
+		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err)
 		assert.Equal(t, "kube-system\tspec.nodeName=minikube\t7", completionResults.Completions[0])
 	}
@@ -190,7 +316,7 @@ func TestUnmanagedCompletion(t *testing.T) {
 		{"get", []string{"pods", "aPod", ">", "/tmp"}},
 	}
 	for _, cmdArg := range cmdArgs {
-		_, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args)
+		_, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.Errorf(t, err, "cmdArgs %s should have returned unmanaged", cmdArg)
 		require.IsType(t, parse.UnmanagedFlagError(""), err)
 	}
@@ -212,7 +338,7 @@ func TestManagedCompletion(t *testing.T) {
 		{"get", []string{"pods", "--all-namespaces", ""}},
 	}
 	for _, cmdArg := range cmdArgs {
-		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args)
+		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err)
 		require.NotNil(t, completionResults)
 	}

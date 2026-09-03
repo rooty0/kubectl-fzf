@@ -10,70 +10,101 @@ __kubectl_fzf_debug()
   fi
 }
 
-# Splits a command line into the part that is none of kubectl's business and the
-# last command on it, since that is the only one being completed. Both
-# `cat f.yaml | k apply -f <TAB>` and `k get pods -oyaml | gre<TAB>` then get the
-# completion they deserve, the first from kubectl and the second from the shell.
-#
-# Assigns to commandPrefix and commandLine, which the caller declares local.
-__kubectl_fzf_split_last_command()
-{
-  setopt localoptions extendedglob noshwordsplit noksh_arrays noposixbuiltins
-  local buffer="$1" token
-  local -a tokens
-  local -i offset=0 tokenStart=0 commandStart=0 afterSeparator=0
+# Where the completion widget below leaves zsh's reading of the command line.
+typeset -ga kubectl_fzf_parsed_words
+typeset -gi kubectl_fzf_parsed_current
+typeset -g kubectl_fzf_parsed_prefix kubectl_fzf_parsed_suffix
 
-  commandPrefix=""
-  commandLine="$buffer"
-  tokens=(${(z)buffer})
-  for token in "${(@)tokens}"; do
-    # (z) is zsh's own lexer and hands the tokens back in order and unchanged, so
-    # each one is located by walking forward over the whitespace between them.
-    while [[ ${buffer[offset+1]} == [[:space:]] ]]; do
-      (( offset++ ))
+# zsh already knows how to read a command line, and gets it right for pipes,
+# quoting and a cursor left of the end alike. That reading is only handed to a
+# completion widget, so here is one. It generates no matches: the candidates come
+# from the binary further down, this exists purely to be told what the user typed.
+__kubectl_fzf_capture_parse()
+{
+  kubectl_fzf_parsed_words=("${words[@]}")
+  kubectl_fzf_parsed_current=$CURRENT
+  kubectl_fzf_parsed_prefix=$PREFIX
+  kubectl_fzf_parsed_suffix=$SUFFIX
+  # Insert nothing, list nothing, leave the line exactly as it was found.
+  compstate[insert]=''
+  compstate[list]=''
+}
+zle -C __kubectl_fzf_capture .complete-word __kubectl_fzf_capture_parse
+
+# complete_in_word makes zsh cut the word at the cursor instead of handing the
+# whole of it over as the prefix, which is what says where in the line that word
+# begins. Setting it here and nowhere else leaves the option the user chose alone
+# everywhere it is theirs to decide, the fallback completion included. The word
+# under the cursor is replaced whole either way.
+__kubectl_fzf_capture_line()
+{
+  setopt localoptions completeinword
+  zle __kubectl_fzf_capture
+}
+
+# Finds where the command under the cursor starts and ends in BUFFER. zsh has
+# already decided which words belong to it, so a pipe or a redirection is out of
+# the picture by then and this only has to locate words it was handed, walking
+# out from the cursor. That the walk matches the buffer at every step is checked,
+# and giving up is safe: the caller then leaves the line alone.
+#
+# Assigns to commandStart and commandEnd, which the caller declares local, as
+# offsets before the first and after the last character of the command.
+__kubectl_fzf_locate_command()
+{
+  setopt localoptions noshwordsplit noksh_arrays
+  local word
+  local -i pos i
+  # PREFIX and SUFFIX are the two halves of the word the cursor sits in, so the
+  # word itself starts and ends that far away from the cursor.
+  commandStart=$(( CURSOR - ${#kubectl_fzf_parsed_prefix} ))
+  commandEnd=$(( CURSOR + ${#kubectl_fzf_parsed_suffix} ))
+
+  pos=$commandStart
+  for (( i = kubectl_fzf_parsed_current - 1; i >= 1; i-- )); do
+    word=${kubectl_fzf_parsed_words[i]}
+    while (( pos > 0 )) && [[ ${BUFFER[pos]} == [[:space:]] ]]; do
+      (( pos-- ))
     done
-    tokenStart=$offset
-    (( offset += ${#token} ))
-    if [[ ${buffer[tokenStart+1,offset]} != "$token" ]]; then
-      # The walk lost track of the buffer, so the offsets cannot be trusted.
-      # Treating the whole line as one command is the old behaviour and is far
-      # better than splicing the line at a wrong position.
-      __kubectl_fzf_debug "Lost track of the buffer at '$token', taking the whole line"
-      return
+    if (( pos < ${#word} )) || [[ ${BUFFER[pos - ${#word} + 1, pos]} != "$word" ]]; then
+      __kubectl_fzf_debug "Lost track of the buffer looking back for '$word'"
+      return 1
     fi
-    if (( afterSeparator )); then
-      # Starting at the first word after the operator leaves whatever spacing the
-      # user typed around that operator untouched.
-      commandStart=$tokenStart
-      afterSeparator=0
-    fi
-    # A bare operator: | || && ; & |& or a redirection such as > >> < 2>. One
-    # inside quotes is not matched, as (z) keeps a quoted string in one token.
-    if [[ $token == [0-9]#[\|\;\&\<\>]## ]]; then
-      afterSeparator=1
-      commandStart=$offset
-    fi
+    (( pos -= ${#word} ))
   done
-  commandPrefix="${buffer[1,commandStart]}"
-  commandLine="${buffer[commandStart+1,-1]}"
+  commandStart=$pos
+
+  pos=$commandEnd
+  for (( i = kubectl_fzf_parsed_current + 1; i <= ${#kubectl_fzf_parsed_words}; i++ )); do
+    word=${kubectl_fzf_parsed_words[i]}
+    while [[ ${BUFFER[pos+1]} == [[:space:]] ]]; do
+      (( pos++ ))
+    done
+    if [[ ${BUFFER[pos+1, pos + ${#word}]} != "$word" ]]; then
+      __kubectl_fzf_debug "Lost track of the buffer looking ahead for '$word'"
+      return 1
+    fi
+    (( pos += ${#word} ))
+  done
+  commandEnd=$pos
+  return 0
 }
 
 __kubectl_fzf_get_completions()
 {
   local rawOutput
-  local -a requestComp cmdWords
-  # TODO Handle query
-  currentWord="$1"
+  local -a requestComp requestWords
+  local -i cursor=$1
   shift
-  cmdWords=("$@")
+  requestWords=("$@")
 
-  __kubectl_fzf_debug "Get completions: cmdWords: '${(q-)cmdWords}', currentWord: '$currentWord'"
+  __kubectl_fzf_debug "Get completions: words: '${(q-)requestWords}', cursor: $cursor"
   # The command line must never be eval'ed: a "$(...)" or a backtick the user has
   # merely typed would run on a Tab press. Build the argv and call it directly.
   # ${=...} keeps a KUBECTL_FZF_COMPLETION_BIN carrying its own arguments working.
   # Everything after -- is one word per argv entry, so a value holding a space
-  # arrives in one piece.
-  requestComp=(${=KUBECTL_FZF_COMPLETION_BIN} k8s_completion --protocol=2 -- "${cmdWords[@]}")
+  # arrives in one piece, and the cursor says which of them is being completed.
+  requestComp=(${=KUBECTL_FZF_COMPLETION_BIN} k8s_completion --protocol=2 "--cursor=$cursor" -- "${requestWords[@]}")
   __kubectl_fzf_debug "About to call: ${(q-)requestComp}"
   zle -R "Calling completion '${requestComp[*]}'"
   rawOutput=$("${requestComp[@]}")
@@ -117,26 +148,19 @@ __kubectl_fzf_get_completions()
 }
 
 __kubectl_fzf_kubectl() {
-  local currentWord previousWord
+  local currentWord
   local completionOutput
   local -a removeWords
   local fallback
 
   zle -R "Starting kubectl-fzf completion"
-  __kubectl_fzf_debug "CURRENT: ${CURRENT}, words[*]: '${words[*]}', ${#words[@]}"
-  currentWord=${words[CURRENT]}
-  previousWord=${words[CURRENT-1]}
-  __kubectl_fzf_debug "Current word: ${currentWord}, previous word: ${previousWord}"
-
-  # We only have 'kubectl g#', fallback to default completion
-  if [[ ${#words[@]} -le 2 ]]; then
-    zle "${kubectl_fzf_default_completion:-expand-or-complete}"
-    return
-  fi
+  __kubectl_fzf_debug "cmdCurrent: ${cmdCurrent}, cmdWords: '${cmdWords[*]}', ${#cmdWords[@]}"
+  currentWord=${cmdWords[cmdCurrent]}
 
   # (Q) strips one level of quoting, so the binary is handed the values kubectl
-  # would see. The words keep their original text for rebuilding the line.
-  __kubectl_fzf_get_completions "$currentWord" "${(@Q)words[2,-1]}"
+  # would see. The words keep their original text for rebuilding the line. The
+  # verb is word 2, so it is the zero of the cursor the binary is told about.
+  __kubectl_fzf_get_completions $(( expandedCurrent - 2 )) "${(@Q)expandedWords[2,-1]}"
   zle -R "Processing completion output"
 
   # If kubectl-fzf doesn't know how to complete this, fall back to default
@@ -159,55 +183,107 @@ __kubectl_fzf_kubectl() {
 
   __kubectl_fzf_debug "Replacing current word '$currentWord' with: '$completionOutput'"
 
-  # Rebuild the buffer from the parsed words, replacing only the current word
-  local -a new_words
-  new_words=("${words[@]}")
-  new_words[$CURRENT]="$completionOutput"
-
-  # Drop the words the completion reported as incompatible with its result, one
-  # occurrence each. Which words those are is the binary's decision, this only
-  # applies it. Stops at "--" since the rest belongs to the executed command.
   if (( ${#removeWords[@]} )); then
-    local -a keptWords pendingRemovals
-    local word
-    local -i argsEnded=0 removalIndex
-    pendingRemovals=("${removeWords[@]}")
-    for word in "${new_words[@]}"; do
-      if (( ! argsEnded )); then
-        [[ $word == "--" ]] && argsEnded=1
-        # (ie) matches the exact string: a word holding glob characters must not
-        # be treated as a pattern.
-        removalIndex=${pendingRemovals[(ie)$word]}
-        if (( removalIndex <= ${#pendingRemovals[@]} )); then
-          pendingRemovals[removalIndex]=()
-          continue
-        fi
-      fi
-      keptWords+=("$word")
-    done
-    new_words=("${keptWords[@]}")
-    __kubectl_fzf_debug "Words after removal: ${new_words[*]}"
+    __kubectl_fzf_rebuild_command || return
+  else
+    __kubectl_fzf_replace_current_word
+  fi
+  __kubectl_fzf_debug "New BUFFER: '$BUFFER', cursor at $CURSOR"
+}
+
+# The usual case: one word becomes another. PREFIX and SUFFIX say where that word
+# lies, so it is cut out and the completion put in its place. Every other
+# character of the line, the spacing around a pipe included, is left alone.
+__kubectl_fzf_replace_current_word()
+{
+  local before="${BUFFER[1, CURSOR - ${#kubectl_fzf_parsed_prefix}]}"
+  local after="${BUFFER[CURSOR + ${#kubectl_fzf_parsed_suffix} + 1, -1]}"
+  local trailing=""
+  # A completed word gets the usual trailing space, unless something already
+  # follows it on the line.
+  [[ $after != [[:space:]]* ]] && trailing=" "
+
+  BUFFER="${before}${completionOutput}${trailing}${after}"
+  CURSOR=$(( ${#before} + ${#completionOutput} + ${#trailing} ))
+}
+
+# Words the completion reported as incompatible with its result have to go, and
+# they sit anywhere on the command. That means writing the command out again
+# rather than splicing one word, so the command has to be found in the line
+# first. Everything outside it is still kept verbatim.
+__kubectl_fzf_rebuild_command()
+{
+  local -a newWords keptWords pendingRemovals
+  local word
+  local -i commandStart commandEnd newCurrent=$cmdCurrent
+  local -i argsEnded=0 removalIndex index=0
+
+  if ! __kubectl_fzf_locate_command; then
+    # Leaving -A in place would produce a command kubectl rejects, so the line is
+    # better left as it is.
+    __kubectl_fzf_debug "Command not located, leaving the line alone"
+    return 1
   fi
 
-  LBUFFER="${commandPrefix}${(j: :)new_words} "
-  __kubectl_fzf_debug "New LBUFFER: '$LBUFFER'"
+  newWords=("${cmdWords[@]}")
+  newWords[$cmdCurrent]="$completionOutput"
+
+  # One occurrence per reported word. Which words those are is the binary's
+  # decision, this only applies it. Stops at "--" since the rest belongs to the
+  # executed command.
+  pendingRemovals=("${removeWords[@]}")
+  for word in "${newWords[@]}"; do
+    (( index++ ))
+    if (( ! argsEnded )); then
+      [[ $word == "--" ]] && argsEnded=1
+      # (ie) matches the exact string: a word holding glob characters must not
+      # be treated as a pattern.
+      removalIndex=${pendingRemovals[(ie)$word]}
+      if (( removalIndex <= ${#pendingRemovals[@]} )); then
+        pendingRemovals[removalIndex]=()
+        # Dropping a word in front of the completed one moves it left.
+        (( index <= cmdCurrent )) && (( newCurrent-- ))
+        continue
+      fi
+    fi
+    keptWords+=("$word")
+  done
+  newWords=("${keptWords[@]}")
+  __kubectl_fzf_debug "Words after removal: ${newWords[*]}"
+
+  local before="${BUFFER[1,commandStart]}"
+  local after="${BUFFER[commandEnd+1,-1]}"
+  local completed="${(j: :)newWords[1,newCurrent]}"
+  local rest=""
+  (( newCurrent < ${#newWords} )) && rest=" ${(j: :)newWords[newCurrent+1,-1]}"
+  local trailing=""
+  [[ -z $rest && $after != [[:space:]]* ]] && trailing=" "
+
+  BUFFER="${before}${completed}${trailing}${rest}${after}"
+  CURSOR=$(( ${#before} + ${#completed} + ${#trailing} ))
 }
 
 # Completion entry point
 kubectl_fzf_completion() {
-  local words firstWord commandPrefix commandLine
+  local firstWord
+  local -a cmdWords expandedWords
+  local -i cmdCurrent expandedCurrent
   setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
   __kubectl_fzf_debug "\n========= starting completion logic =========="
 
-  # Only the last command on the line is being completed, everything before it is
-  # kept verbatim.
-  __kubectl_fzf_split_last_command "$LBUFFER"
-  words=(${(z)commandLine})
-  __kubectl_fzf_debug "LBUFFER: '$LBUFFER', prefix: '$commandPrefix', command: '$commandLine', words: '${words[*]}', ${#words}"
+  # Let zsh read the line. Only the command under the cursor comes back, so a
+  # pipe in front of it is already none of our business, and a cursor left of the
+  # end is placed for us.
+  __kubectl_fzf_capture_line
+  cmdWords=("${kubectl_fzf_parsed_words[@]}")
+  cmdCurrent=$kubectl_fzf_parsed_current
+  __kubectl_fzf_debug "BUFFER: '$BUFFER', words: '${cmdWords[*]}', current: $cmdCurrent"
 
-  firstWord=${words[1]}
+  firstWord=${cmdWords[1]}
 
-  if [[ ${#words[@]} -le 1 && ${commandLine[-1]} != " " ]]; then
+  # The command name or the verb is under the cursor, and kubectl completes its
+  # own verbs better than we would.
+  if (( cmdCurrent <= 2 )); then
     zle "${kubectl_fzf_default_completion:-expand-or-complete}"
     return
   fi
@@ -218,14 +294,13 @@ kubectl_fzf_completion() {
     return
   fi
 
-  if [[ $RBUFFER != "" ]]; then
-    # TODO Handle right buffer
-    zle "${kubectl_fzf_default_completion:-expand-or-complete}"
-    return
-  fi
-
+  # What the binary is told about is kubectl, whatever the user calls it. The
+  # words that go back on the line stay as they were typed, so an alias is not
+  # spelled out behind the user's back.
+  expandedWords=("${cmdWords[@]}")
+  expandedCurrent=$cmdCurrent
   if [[ "$firstWord" != "kubectl" ]]; then
-    # Try to resolve alias
+    local -a expanded
     expanded=(${(z)aliases[$firstWord]})
     if [ ${#expanded} -lt 1 ]; then
       zle "${kubectl_fzf_default_completion:-expand-or-complete}"
@@ -236,18 +311,15 @@ kubectl_fzf_completion() {
       return
     fi
     # We have resolved a kubectl alias
-    for word in "${words[@]:1}"; do
+    local -i aliasLength=${#expanded}
+    for word in "${cmdWords[@]:1}"; do
       expanded+=("$word")
     done
-    words=("${expanded[@]}")
+    expandedWords=("${expanded[@]}")
+    # An alias standing for several words pushes everything behind it to the
+    # right, the completed word included.
+    (( expandedCurrent += aliasLength - 1 ))
   fi
-  # An empty trailing word marks a word that is only being started. It used to be
-  # a single space, which a command line passed as one string could not tell
-  # apart from padding; one argv entry per word can.
-  if [[ ${commandLine[-1]} == " " ]]; then
-    words+=("")
-  fi
-  CURRENT=${#words[@]}
   __kubectl_fzf_kubectl
 }
 

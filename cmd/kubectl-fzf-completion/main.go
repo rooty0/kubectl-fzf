@@ -58,7 +58,13 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 	if !util.IsStringIn(firstWord, verbs) {
 		os.Exit(FallbackExitCode)
 	}
+	// The cursor on the verb means the verb itself is being completed, which is
+	// kubectl's own business.
+	if request.Cursor == 0 {
+		os.Exit(FallbackExitCode)
+	}
 	args = args[1:]
+	cursor := request.Cursor - 1
 
 	fetchConfigCli := fetcher.GetFetchConfigCli()
 	f := fetcher.NewFetcher(&fetchConfigCli)
@@ -68,7 +74,17 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 		os.Exit(FallbackExitCode)
 	}
 
-	completionResults, err := completion.ProcessCommandArgs(firstWord, args, f)
+	// A --context on the line says which cluster the completion is about, so it
+	// is applied before anything is fetched. The word under the cursor is left
+	// out of that: it is being typed, and half a context name names nothing.
+	if contextName := parse.ParseContextFromArgs(parse.WordsBesideCursor(args, cursor)); contextName != nil {
+		if err := f.SetContext(*contextName); err != nil {
+			logrus.Warnf("Cannot complete for the context on the command line: %s", err)
+			os.Exit(FallbackExitCode)
+		}
+	}
+
+	completionResults, err := completion.ProcessCommandArgs(firstWord, args, cursor, f)
 	if e, ok := err.(resources.UnknownResourceError); ok {
 		logrus.Warnf("Unknown resource type: %s", e)
 		os.Exit(FallbackExitCode)
@@ -95,7 +111,7 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 	if args, exist := os.LookupEnv("KUBECTL_FZF_ARGS"); exist {
 		fzfArgs = strings.Split(args, " ")
 	}
-	query := completion.ExtractQueryFromArgs(args)
+	query := completion.ExtractQueryFromArgs(parse.WordsUpToCursor(args, cursor))
 	fzfResult, err := fzf.CallFzf(formattedComps, query, fzfArgs)
 	if err != nil {
 		var e fzf.InterruptedCommandError
@@ -105,7 +121,7 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 		}
 		logrus.Fatalf("Call fzf error: %s", err)
 	}
-	res, err := results.ProcessResult(firstWord, args, f, fzfResult)
+	res, err := results.ProcessResult(firstWord, args, cursor, f, fzfResult)
 	if err != nil {
 		logrus.Fatalf("Process result error: %s", err)
 	}

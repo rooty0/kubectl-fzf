@@ -26,7 +26,7 @@ type Result struct {
 
 // ProcessResult handles fzf output and provides completion to use
 // The fzfResult should have the first 3 columns of the fzf preview
-func ProcessResult(cmdUse string, cmdArgs []string,
+func ProcessResult(cmdUse string, cmdArgs []string, cursor int,
 	f *fetcher.Fetcher, fzfResult string) (*Result, error) {
 	logrus.Debugf("Processing fzf result %s", fzfResult)
 	logrus.Debugf("Cmd command %s", cmdArgs)
@@ -34,7 +34,7 @@ func ProcessResult(cmdUse string, cmdArgs []string,
 	if err != nil {
 		return nil, err
 	}
-	return processResultWithNamespace(cmdUse, cmdArgs, fzfResult, namespace)
+	return processResultWithNamespace(cmdUse, cmdArgs, cursor, fzfResult, namespace)
 }
 
 func parseNamespaceFlag(cmdArgs []string) (*string, error) {
@@ -46,7 +46,7 @@ func parseNamespaceFlag(cmdArgs []string) (*string, error) {
 	return cmdNamespace, err
 }
 
-func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult string, currentNamespace string) (*Result, error) {
+func processResultWithNamespace(cmdUse string, cmdArgs []string, cursor int, fzfResult string, currentNamespace string) (*Result, error) {
 	// If apiresource:
 	// 0 -> fullname, 1 -> shortname, 2 -> groupversion
 	// If namespaceless resource:
@@ -58,7 +58,11 @@ func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult strin
 		return nil, fmt.Errorf("fzf result should have at least 3 elements, got %v", resultFields)
 	}
 	logrus.Debugf("Processing fzfResult '%s', cmdArgs '%s', current namespace '%s'", fzfResult, cmdArgs, currentNamespace)
-	resourceType, flagCompletion, err := parse.ParseFlagAndResources(cmdUse, cmdArgs)
+	// The word being completed, and so what the fzf output means, is settled by
+	// the words up to the cursor. The namespace flags read further down are read
+	// from the whole line, since one sitting past the cursor binds all the same.
+	completed := parse.WordsUpToCursor(cmdArgs, cursor)
+	resourceType, flagCompletion, err := parse.ParseFlagAndResources(cmdUse, completed)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +111,7 @@ func processResultWithNamespace(cmdUse string, cmdArgs []string, fzfResult strin
 		}
 		logrus.Debugf("Namespace parsed: %s", *cmdNamespace)
 	}
-	lastWord := cmdArgs[len(cmdArgs)-1]
+	lastWord := completed[len(completed)-1]
 	// add flag to the completion
 	lastFlags := []string{"-l=", "-l", "--field-selector=", "--selector=", "-n=", "--namespace=", "-n"}
 	if util.IsStringIn(lastWord, lastFlags) {
