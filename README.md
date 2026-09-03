@@ -33,6 +33,7 @@ Table of Contents
    * [kubectl-fzf-server: local version](#kubectl-fzf-server-local-version)
    * [kubectl-fzf-server: pod version](#kubectl-fzf-server-pod-version)
    * [Completion](#completion)
+      * [Contexts](#contexts)
       * [Configuration](#configuration)
 * [Troubleshooting](#troubleshooting)
    * [Debug kubectl-fzf-completion](#debug-kubectl-fzf-completion)
@@ -45,6 +46,8 @@ Table of Contents
 - Fast completion
 - Label autocompletion
 - Automatic namespace switch
+- Completion anywhere on the line, including after a pipe
+- Contexts, clusters and users completed from your kubeconfig
 
 # Requirements
 
@@ -74,12 +77,12 @@ Make sure `kubectl-fzf-completion` is in your `$PATH`, as this is what your shel
 Source the autocompletion functions:
 ```
 # bash version
-wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.bash -O ~/.kubectl_fzf.bash
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/fork/shell/kubectl_fzf.bash -O ~/.kubectl_fzf.bash
 echo "source <(kubectl completion bash)" >> ~/.bashrc
 echo "source ~/.kubectl_fzf.bash" >> ~/.bashrc
 
 # zsh version
-wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.plugin.zsh -O ~/.kubectl_fzf.plugin.zsh
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/fork/shell/kubectl_fzf.plugin.zsh -O ~/.kubectl_fzf.plugin.zsh
 echo "source <(kubectl completion zsh)" >> ~/.zshrc
 echo "source ~/.kubectl_fzf.plugin.zsh" >> ~/.zshrc
 ```
@@ -89,7 +92,7 @@ echo "source ~/.kubectl_fzf.plugin.zsh" >> ~/.zshrc
 You can use [antigen](https://github.com/zsh-users/antigen) to load it as a zsh plugin
 ```shell
 antigen bundle robbyrussell/oh-my-zsh plugins/docker
-antigen bundle rooty0/kubectl-fzf@main shell/
+antigen bundle rooty0/kubectl-fzf@fork shell/
 ```
 
 ## kubectl-fzf-server
@@ -98,7 +101,7 @@ antigen bundle rooty0/kubectl-fzf@main shell/
 
 You can deploy `kubectl-fzf-server` as a pod in your cluster.
 
-From the [k8s directory](https://github.com/rooty0/kubectl-fzf/tree/main/k8s):
+From the [k8s directory](https://github.com/rooty0/kubectl-fzf/tree/fork/k8s):
 ```shell
 helm template --namespace myns --set image.kubectl_fzf_server.tag=v3 --set toleration=aToleration . | kubectl apply -f -
 ```
@@ -112,7 +115,7 @@ You can install `kubectl-fzf-server` as a systemd unit server.
 ```
 # Create user systemd config
 mkdir -p ~/.config/systemd/user
-wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/systemd/kubectl_fzf_server.service -O ~/.config/systemd/user/kubectl_fzf_server.service
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/fork/systemd/kubectl_fzf_server.service -O ~/.config/systemd/user/kubectl_fzf_server.service
 # Set fullpath of kubectl-fzf-server
 sed -i "s#INSTALL_PATH#$GOPATH/bin#" ~/.config/systemd/user/kubectl_fzf_server.service
 
@@ -212,8 +215,11 @@ Drawbacks:
 
 Once `kubectl-fzf-server` is running, you will be able to use `kubectl_fzf` by calling the kubectl completion
 ```shell
-# Get fzf completion on pods on all namespaces
+# Get fzf completion on pods in the current namespace
 kubectl get pod <TAB>
+
+# Across all namespaces. Picking a pod puts back its name and namespace, and drops -A
+kubectl get pod -A <TAB>
 
 # Open fzf autocompletion on all available label
 kubectl get pod -l <TAB>
@@ -224,6 +230,15 @@ kubectl get pod --field-selector <TAB>
 # This will fallback to the normal kubectl completion (if sourced) 
 kubectl <TAB>
 ```
+
+### Contexts
+
+A `--context` on the command line is honoured: `kubectl get pods --context other <TAB>` completes
+from that context and defaults to its namespace, not the current one.
+
+`kubectl-fzf-server` caches only the context it watches, which is the current one. A context it has
+never watched has no cache, so completion for it falls back to kubectl rather than answer from the
+wrong cluster. Switching to that context once, while the server runs, caches it for later use.
 
 ### Configuration
 

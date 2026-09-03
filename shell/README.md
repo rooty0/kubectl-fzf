@@ -15,30 +15,36 @@ source ~/.kubectl_fzf.plugin.zsh # or whatever you named the plugin file
 k() {
   kubecolor --force-colors=truecolor "$@"
 }
-# Wrap kubectl_fzf_completion so that "k ..." is treated like "kubectl ..." for completion,
-# but the command line still shows "k" and executes via the k() function.
+
+# The plugin resolves a kubectl alias on its own, but "k" is a function here, so
+# the command word is swapped for "kubectl" just long enough to complete and then
+# put back. Where that word sits is asked of the plugin rather than assumed, so a
+# "k" after a pipe, or a cursor left of the end of the line, works the same.
 _kubectl_fzf_k_wrapper() {
   emulate -L zsh
   setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
+  local -i commandStart commandEnd cursorAfter
 
-  # If the first word is "k", temporarily pretend it is "kubectl" for completion
-  local words=(${(z)LBUFFER})
-  if [[ ${#words[@]} -gt 0 && ${words[1]} == k ]]; then
-    # Swap "k" -> "kubectl" just for the completion widget
-    local orig_lbuffer="$LBUFFER"
-    LBUFFER="kubectl ${LBUFFER#k }"
-
-    # Run the original kubectl-fzf completion
+  __kubectl_fzf_capture_line
+  if [[ ${kubectl_fzf_parsed_words[1]} != k ]] ||
+     (( kubectl_fzf_parsed_current == 1 )) ||
+     ! __kubectl_fzf_locate_command; then
     zle kubectl_fzf_completion
+    return
+  fi
 
-    # After completion, if the buffer still starts with "kubectl ",
-    # swap it back to "k " so the final command is "k ..."
-    if [[ $LBUFFER == kubectl\ * ]]; then
-      LBUFFER="k ${LBUFFER#kubectl }"
-    fi
-  else
-    # For everything else, just use kubectl-fzf as normal
-    zle kubectl_fzf_completion
+  # "kubectl" is six characters longer than "k".
+  BUFFER="${BUFFER[1,commandStart]}kubectl${BUFFER[commandStart+2,-1]}"
+  CURSOR=$(( CURSOR + 6 ))
+
+  zle kubectl_fzf_completion
+
+  # Put "k" back. The cursor is worked out before the buffer is assigned, since
+  # assigning a shorter line moves the cursor on its own.
+  if [[ ${BUFFER[commandStart+1,commandStart+7]} == kubectl ]]; then
+    cursorAfter=$(( CURSOR - 6 ))
+    BUFFER="${BUFFER[1,commandStart]}k${BUFFER[commandStart+8,-1]}"
+    CURSOR=$cursorAfter
   fi
 }
 
