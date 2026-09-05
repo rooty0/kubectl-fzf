@@ -13,7 +13,9 @@ The `main` branch is the primary branch - that's where all new development and f
 
 If you'd like to contribute, please make sure to open your pull requests against the `main` branch.
 
-I'm not planning to maintain the GitHub Releases page the way it was done upstream. Use `go install` as described below, or build from source - it's super easy.
+Tagged releases are built with GoReleaser: you get binaries for macOS/Linux (amd64/arm64) on the
+[Releases page](https://github.com/rooty0/kubectl-fzf/releases) and a docker image at
+`ghcr.io/rooty0/kubectl-fzf`. `go install` as described below works too.
 
 Table of Contents
 =================
@@ -76,6 +78,9 @@ make build # Run to generate the two binaries: kubectl-fzf-completion and kubect
 
 Note: Use `kubectl-fzf-server` only if you want to run the server locally
 
+If you prefer prebuilt binaries, grab an archive for your OS/arch from the
+[Releases page](https://github.com/rooty0/kubectl-fzf/releases).
+
 Make sure `kubectl-fzf-completion` is in your `$PATH`, as this is what your shell executes (`go install` places it in `$(go env GOPATH)/bin`)
 
 ## Shell autocompletion
@@ -112,7 +117,7 @@ From the [k8s directory](https://github.com/rooty0/kubectl-fzf/tree/main/k8s):
 helm template --namespace myns --set image.kubectl_fzf_server.tag=v3 --set toleration=aToleration . | kubectl apply -f -
 ```
 
-You can check the latest image version [here](https://hub.docker.com/r/rooty0/kubectl-fzf).
+You can check the available image tags [here](https://github.com/rooty0/kubectl-fzf/pkgs/container/kubectl-fzf).
 
 ### Install kubectl-fzf-server as a service
 

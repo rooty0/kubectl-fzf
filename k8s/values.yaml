@@ -6,7 +6,7 @@ docker:
 
 image:
   kubectl_fzf_server:
-    name: rooty0/kubectl-fzf
+    name: ghcr.io/rooty0/kubectl-fzf
     tag: v3
 
 resources:

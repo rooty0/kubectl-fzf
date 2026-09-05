@@ -1,5 +1,6 @@
 FROM alpine:latest
+ARG TARGETPLATFORM
 WORKDIR /
-COPY kubectl-fzf-server .
+COPY $TARGETPLATFORM/kubectl-fzf-server ./kubectl-fzf-server
 
 ENTRYPOINT ["/kubectl-fzf-server"]

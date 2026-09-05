@@ -38,10 +38,10 @@ test-shell:
 	zsh shell/kubectl_fzf_test.zsh
 
 snapshot:
-	GO_VERSION="$(shell go version)" goreleaser release --snapshot --rm-dist
+	GO_VERSION="$(shell go version)" goreleaser release --snapshot --clean
 
 release:
-	GO_VERSION="$(shell go version)" goreleaser release --rm-dist
+	GO_VERSION="$(shell go version)" goreleaser release --clean
 
 graph:
 	goda graph ./... | dot -Tsvg -o graph.svg

@@ -1,6 +1,10 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
 before:
   hooks:
     - go mod tidy
+
 builds:
 
 - id: "kubectl-fzf-server"
@@ -15,6 +19,7 @@ builds:
     - linux
   goarch:
     - amd64
+    - arm64
 
 - id: "kubectl-fzf-completion"
   main: cmd/kubectl-fzf-completion/main.go
@@ -28,6 +33,7 @@ builds:
     - linux
   goarch:
     - amd64
+    - arm64
 
 archives:
 - id: kubectl-fzf
@@ -38,38 +44,40 @@ archives:
     - shell/kubectl_fzf.bash
   name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
-dockers:
-  - image_templates:
-    - "rooty0/kubectl-fzf:{{ .Tag }}"
-    - "rooty0/kubectl-fzf:v{{ .Major }}"
-    - "rooty0/kubectl-fzf:v{{ .Major }}.{{ .Minor }}"
-    - "rooty0/kubectl-fzf:latest"
+# Multi-arch images via buildx; built context has $TARGETPLATFORM/<binary>.
+# In --snapshot runs images get a per-platform suffix and are not pushed.
+dockers_v2:
+  - ids:
+      - kubectl-fzf-server
     dockerfile: Dockerfile.goreleaser
-    goos: linux
-    goarch: amd64
-    build_flag_templates:
-      - --label=org.opencontainers.image.title={{ .ProjectName }}
-      - --label=org.opencontainers.image.description={{ .ProjectName }}
-      - --label=org.opencontainers.image.url=https://github.com/rooty0/kubectl-fzf
-      - --label=org.opencontainers.image.source=https://github.com/rooty0/kubectl-fzf
-      - --label=org.opencontainers.image.version={{ .Version }}
-      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
-      - --label=org.opencontainers.image.revision={{ .FullCommit }}
-      - --label=org.opencontainers.image.licenses=MIT
+    images:
+      - ghcr.io/rooty0/kubectl-fzf
+    tags:
+      - "{{ .Tag }}"
+      - "v{{ .Major }}"
+      - "v{{ .Major }}.{{ .Minor }}"
+      - "latest"
+    annotations:
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.url": "https://github.com/rooty0/kubectl-fzf"
+      "org.opencontainers.image.source": "https://github.com/rooty0/kubectl-fzf"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.created": '{{ time "2006-01-02T15:04:05Z07:00" }}'
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.licenses": "MIT"
 
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
   algorithm: sha256
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 release:
   github:
     owner: rooty0
     name: kubectl-fzf
   draft: true
   prerelease: auto
-  name_template: "v{{.Version}}"
-  disable: false
+  name_template: "v{{ .Version }}"
 
 changelog:
   sort: asc
