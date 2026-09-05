@@ -1,6 +1,7 @@
 package fetcher
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path"
@@ -79,7 +80,7 @@ func (f *Fetcher) checkRecentCache(r resources.ResourceType) (map[string]resourc
 	return nil, nil
 }
 
-func (f *Fetcher) checkHttpCache(endpoint string, r resources.ResourceType) (map[string]resources.K8sResource, error) {
+func (f *Fetcher) checkHttpCache(ctx context.Context, endpoint string, r resources.ResourceType) (map[string]resources.K8sResource, error) {
 	cacheFile := path.Join(f.fetcherCachePath, f.GetContext(), r.String())
 	finfo, err := os.Stat(cacheFile)
 	if err != nil {
@@ -99,7 +100,7 @@ func (f *Fetcher) checkHttpCache(endpoint string, r resources.ResourceType) (map
 	localLastModified := f.fetcherState.getLastModifiedTime(f.GetContext(), r)
 	if localLastModified != nil {
 		resourcePath := f.getResourceHttpPath(endpoint, r)
-		headers, err := util.HeadFromHttpServer(resourcePath)
+		headers, err := util.HeadFromHttpServer(ctx, resourcePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error on head of %s", resourcePath)
 		}

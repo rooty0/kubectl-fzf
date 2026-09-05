@@ -14,8 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Fetcher) loadResourceFromHttpServer(endpoint string, r resources.ResourceType) (map[string]resources.K8sResource, error) {
-	resources, err := f.checkHttpCache(endpoint, r)
+func (f *Fetcher) loadResourceFromHttpServer(ctx context.Context, endpoint string, r resources.ResourceType) (map[string]resources.K8sResource, error) {
+	resources, err := f.checkHttpCache(ctx, endpoint, r)
 	if err != nil {
 		logrus.Infof("Error getting resources from cache: %s", err)
 	}
@@ -25,7 +25,7 @@ func (f *Fetcher) loadResourceFromHttpServer(endpoint string, r resources.Resour
 	}
 	logrus.Debugf("Loading from %s", endpoint)
 	resourcePath := f.getResourceHttpPath(endpoint, r)
-	headers, body, err := util.GetFromHttpServer(resourcePath)
+	headers, body, err := util.GetFromHttpServer(ctx, resourcePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "error reading body content")
 	}
@@ -49,7 +49,7 @@ func (f *Fetcher) getResourcesFromPortForward(ctx context.Context, r resources.R
 		return nil, err
 	}
 	endpoint := fmt.Sprintf("localhost:%d", f.portForwardLocalPort)
-	resources, err := f.loadResourceFromHttpServer(endpoint, r)
+	resources, err := f.loadResourceFromHttpServer(ctx, endpoint, r)
 	stopChan <- struct{}{}
 	return resources, err
 }
@@ -111,17 +111,20 @@ func (f *Fetcher) getPortForwardRequest(ctx context.Context) (portForwardRequest
 func (f *Fetcher) openPortForward(ctx context.Context) (chan struct{}, error) {
 	stopChan := make(chan struct{})
 	readyChan := make(chan struct{})
-	errChan := make(chan error)
+	// Buffered so the goroutine's send always lands even when the readiness
+	// wait below has already returned, e.g. on a ctx timeout: no leak, and no
+	// send on a closed channel either since errChan is left to be garbage
+	// collected.
+	errChan := make(chan error, 1)
 	portForwardRequest, err := f.getPortForwardRequest(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create port forward")
 	}
 	go func() {
 		restConfig, err := f.GetClientConfig()
-		if err != nil {
-			errChan <- err
+		if err == nil {
+			err = portforward.Open(restConfig, portForwardRequest, readyChan, stopChan)
 		}
-		err = portforward.Open(restConfig, portForwardRequest, readyChan, stopChan)
 		if err != nil {
 			errChan <- err
 		}
@@ -130,8 +133,13 @@ func (f *Fetcher) openPortForward(ctx context.Context) (chan struct{}, error) {
 	case err := <-errChan:
 		return nil, errors.Wrap(err, "error opening port forward")
 	case <-readyChan:
+	case <-ctx.Done():
+		// The port-forward never became ready before the caller's deadline.
+		// Abandon it instead of blocking forever, and stop the forward so the
+		// goroutine above can exit.
+		close(stopChan)
+		return nil, errors.Wrap(ctx.Err(), "error opening port forward")
 	}
-	close(errChan)
 	logrus.Debug("Port forward ready")
 	return stopChan, nil
 }

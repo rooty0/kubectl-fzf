@@ -14,7 +14,7 @@ import (
 
 func (f *Fetcher) getStatsFromHttpServer(ctx context.Context, url string) ([]*store.Stats, error) {
 	logrus.Debugf("Fetching stats from %s", url)
-	_, body, err := util.GetFromHttpServer(url)
+	_, body, err := util.GetFromHttpServer(ctx, url)
 	if err != nil {
 		return nil, errors.Wrap(err, "error on http get")
 	}

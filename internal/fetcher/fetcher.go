@@ -77,7 +77,7 @@ func (f *Fetcher) GetResources(ctx context.Context, r resources.ResourceType) (m
 
 	// Fetch remote
 	if util.IsAddressReachable(f.httpEndpoint) {
-		return f.loadResourceFromHttpServer(f.httpEndpoint, r)
+		return f.loadResourceFromHttpServer(ctx, f.httpEndpoint, r)
 	}
 	return f.getResourcesFromPortForward(ctx, r)
 }

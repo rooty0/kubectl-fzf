@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime/pprof"
 	"strings"
+	"time"
 
 	"github.com/rooty0/kubectl-fzf/v3/internal/completion"
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
@@ -138,7 +139,9 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 func statsFun(cmd *cobra.Command, args []string) {
 	fetchConfigCli := fetcher.GetFetchConfigCli()
 	f := fetcher.NewFetcher(&fetchConfigCli)
-	ctx := context.Background()
+	// Fetching stats goes over http or a port-forward: bound the wait.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	stats, err := f.GetStats(ctx)
 	util.FatalIf(err)
 	statsOutput := store.GetStatsOutput(stats)
