@@ -129,6 +129,7 @@ dist/
 kubeconfig
 # Credential-free kubeconfig fixtures the tests need
 !internal/**/testdata/kubeconfig
+!shell/tests/fixtures/kubeconfig
 TEMP.md
 tags
 TODO

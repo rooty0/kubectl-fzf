@@ -96,7 +96,23 @@ echo "source ~/.kubectl_fzf.bash" >> ~/.bashrc
 wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.plugin.zsh -O ~/.kubectl_fzf.plugin.zsh
 echo "source <(kubectl completion zsh)" >> ~/.zshrc
 echo "source ~/.kubectl_fzf.plugin.zsh" >> ~/.zshrc
+
+# fish version
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.fish -O ~/.config/fish/conf.d/kubectl_fzf.fish
 ```
+
+Feature notes per shell:
+
+- zsh and fish support the full feature set: mid-line completion, completion after a
+  pipe, kubectl aliases, and dropping `-A` once the picked result pins a namespace.
+  They bind Tab and remember your previous Tab binding as the fallback.
+- bash registers a completion for `kubectl` (and for existing kubectl aliases at
+  source time). Two things bash's programmable completion cannot express are
+  delegated to kubectl's own completion instead: mid-word replacement with text
+  after the cursor, and removing `-A` from the line.
+- bash completion strips `=` from `COMP_WORDBREAKS` so `--flag=value` arrives as
+  one word; bash-completion based scripts already re-split `=` internally and are
+  unaffected.
 
 ### Zsh plugins: Antigen
 
@@ -288,6 +304,12 @@ Check that the completion function is correctly sourced:
 ```
 type kubectl_fzf_completion
 kubectl_fzf_completion is a shell function from /home/bonnefoa/.antigen/bundles/kubectl-fzf-main/shell/kubectl_fzf.plugin.zsh
+```
+
+In fish, check the Tab binding instead:
+```
+bind \t
+bind \t __kubectl_fzf_completion
 ```
 
 Use zsh completion debug:

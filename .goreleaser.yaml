@@ -42,6 +42,7 @@ archives:
     - LICENSE
     - shell/kubectl_fzf.plugin.zsh
     - shell/kubectl_fzf.bash
+    - shell/kubectl_fzf.fish
   name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
 # Multi-arch images via buildx; built context has $TARGETPLATFORM/<binary>.

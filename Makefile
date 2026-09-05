@@ -37,6 +37,11 @@ test:
 test-shell:
 	zsh shell/kubectl_fzf_test.zsh
 
+# All shell suites (zsh, fish, bash, and the fzf end-to-end) in a pristine
+# container: nothing but docker and go needed locally.
+test-shell-docker:
+	bash shell/tests/run_in_docker.sh
+
 snapshot:
 	GO_VERSION="$(shell go version)" goreleaser release --snapshot --clean
 

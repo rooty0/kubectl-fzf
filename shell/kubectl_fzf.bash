@@ -1,3 +1,13 @@
+# shellcheck shell=bash
+# kubectl-fzf bash support. Source this file after "kubectl completion bash".
+#
+# bash splits COMP_WORDS at every COMP_WORDBREAKS character, and the default
+# set includes '=': --context=prod would arrive here as three harmless-looking
+# words, each a lie. Taking '=' out fixes attached flag values for every
+# completion, ours included; what breaks is the (rare, and bash-completion
+# already re-splits them internally) style of completing after a bare '='.
+COMP_WORDBREAKS="${COMP_WORDBREAKS//=/}"
+
 KUBECTL_FZF_COMPLETION_BIN=${KUBECTL_FZF_COMPLETION_BIN:-kubectl-fzf-completion}
 
 __kubectl_fzf_debug()
@@ -8,46 +18,120 @@ __kubectl_fzf_debug()
     fi
 }
 
-# Reports its result through the caller's completionOutput and fallback
-# variables. Nothing may be written to stdout: the caller feeds this function's
-# result to COMPREPLY, so a printed status line would be pasted into the command
-# line instead of completing it.
+# Calls the completion binary and reads its structured answer. Reports through
+# the globals completionOutput, fallback and removeWords: bash completion
+# cannot rewrite the command line, so a word the binary wants gone (like -A in
+# the company of a namespaced name) hands the line to kubectl's own completion
+# instead of leaving something kubectl would reject.
 __kubectl_fzf_get_completions()
 {
-    local cmdArgs currentWord exitCode
-    local -a requestComp
-    cmdArgs="$1"
-    # TODO Handle query
-    currentWord="$2"
+    local -a requestComp requestWords
+    local rawOutput line
+    local -i exitCode relCursor
 
-    __kubectl_fzf_debug "Get completions: cmdArgs: '$cmdArgs', currentWord: '$currentWord'"
-    # The command line must never be eval'ed: a "$(...)" or a backtick the user has
-    # merely typed would run on a Tab press. Build the argv and call it directly.
-    # Passing cmdArgs as a single argument also matters, the completion binary
-    # wants the whole argument string as one argv entry.
-    requestComp=($KUBECTL_FZF_COMPLETION_BIN k8s_completion "$cmdArgs")
+    # What the binary is told about is kubectl, whatever the user calls it. An
+    # alias is expanded for the binary only: the words on the line stay as
+    # typed, so the alias is not spelled out behind the user's back.
+    local first="${COMP_WORDS[0]}"
+    requestWords=("${COMP_WORDS[@]}")
+    relCursor=$COMP_CWORD
+    if [[ "$first" != "kubectl" ]]; then
+        local aliasDef body
+        aliasDef=$(alias "$first" 2>/dev/null)
+        # aliasDef: alias k='kubectl --context x'
+        body="${aliasDef#*=}"
+        body="${body#[\'\"]}"
+        body="${body%[\'\"]}"
+        local -a expanded
+        # read splits on IFS without globbing a stray * in the alias body.
+        IFS=' ' read -ra expanded <<< "$body"
+        if [[ "${expanded[0]:-}" != "kubectl" ]]; then
+            __kubectl_fzf_debug "first word '$first' is not kubectl or an alias to it"
+            fallback="true"
+            return
+        fi
+        requestWords=("${expanded[@]}" "${COMP_WORDS[@]:1}")
+        # An alias standing for several words pushes the cursor right.
+        relCursor=$(( COMP_CWORD + ${#expanded[@]} - 1 ))
+    fi
+
+    # The cursor on the command name or on the verb belongs to the shell's own
+    # completion; kubectl knows its verbs better than we would.
+    if (( relCursor < 2 )); then
+        fallback="true"
+        return
+    fi
+    # The verb is the first word the binary hears about, so the cursor shifts
+    # one left: 0 there means the verb is being completed, and the binary
+    # declines that position itself.
+    relCursor=$(( relCursor - 1 ))
+
+    # COMP_WORDS keeps the quotes of a closed quoted segment. One level is
+    # stripped so the binary sees the value the way kubectl would; a segment
+    # split at "=" already arrived whole thanks to the COMP_WORDBREAKS tweak.
+    local w
+    local -a quotedChecked=()
+    for w in "${requestWords[@]:1}"; do
+        case $w in
+            \"*\")
+                (( ${#w} >= 2 )) && w="${w:1:${#w}-2}"
+                ;;
+            \'*\')
+                (( ${#w} >= 2 )) && w="${w:1:${#w}-2}"
+                ;;
+        esac
+        quotedChecked+=("$w")
+    done
+
+    # The command line must never be eval'ed: a "$(...)" or a backtick the user
+    # has merely typed would run on a Tab press. One word per argv entry after
+    # --, so a value holding a space arrives in one piece.
+    requestComp=($KUBECTL_FZF_COMPLETION_BIN k8s_completion --protocol=2 "--cursor=$relCursor" -- "${quotedChecked[@]}")
     __kubectl_fzf_debug "About to call: ${requestComp[*]}"
-    completionOutput=$("${requestComp[@]}")
+    rawOutput=$("${requestComp[@]}")
     exitCode=$?
-    __kubectl_fzf_debug "completion output: ${completionOutput}, exit code ${exitCode}"
+    __kubectl_fzf_debug "raw output: ${rawOutput}, exit code ${exitCode}"
 
-    if [[ $exitCode == 5 ]]; then
-        # No completion available
-        __kubectl_fzf_debug "No completion available, fallback to default completion"
+    case $exitCode in
+        5) # No completion available
+            __kubectl_fzf_debug "No completion available, fallback to default completion"
+            fallback="true"
+            return
+            ;;
+        6) # Unknown resource type
+            __kubectl_fzf_debug "Unknown resource type, fallback to default completion"
+            fallback="true"
+            return
+            ;;
+        0) ;;
+        *)
+            # Error on completion: keep Tab working via kubectl's own completion.
+            __kubectl_fzf_debug "error when calling ${requestComp[*]}, output: ${rawOutput}"
+            fallback="true"
+            return
+            ;;
+    esac
+
+    # One key=value per line. Unknown keys are ignored so the binary can grow
+    # new ones without breaking an older plugin.
+    while IFS= read -r line; do
+        case $line in
+            completion=*) completionOutput="${line#completion=}" ;;
+            remove-word=*) removeWords+=("${line#remove-word=}") ;;
+            "") ;;
+            *) __kubectl_fzf_debug "Ignoring unknown response line '$line'" ;;
+        esac
+    done <<< "$rawOutput"
+
+    if [[ "$completionOutput" == error* ]]; then
         fallback="true"
         return
     fi
-    if [[ $exitCode == 6 ]]; then
-        # Unknow resource type, fallback to default completion
-        __kubectl_fzf_debug "Unknown resource type, fallback to default completion"
-        fallback="true"
-        return
-    fi
-    if [[ $exitCode != 0 ]]; then
-        # Error on completion. Falling back keeps Tab working while the server or
-        # the cache is unavailable, at the cost of kubectl querying the API.
-        __kubectl_fzf_debug "error when calling ${requestComp[*]}, output: ${completionOutput}"
-        completionOutput=""
+    if (( ${#removeWords[@]} )); then
+        # bash cannot drop words mid-line from a completion function, so a
+        # completion that needs one removed is declined entirely; kubectl's own
+        # completion at least leaves the line valid.
+        __kubectl_fzf_debug "the binary wants words removed; bash cannot, falling back"
         fallback="true"
         return
     fi
@@ -60,38 +144,24 @@ __kubectl_fzf_default_completion()
     local defaultCompletion=${KUBECTL_FZF_DEFAULT_COMPLETION:-__start_kubectl}
 
     if declare -F "$defaultCompletion" >/dev/null 2>&1; then
-        # __start_kubectl rebuilds cur/words/cword from COMP_WORDS, so the
-        # truncation done by the caller does not reach it.
         "$defaultCompletion"
         return
     fi
-    # Without kubectl's completion sourced there is nothing better to offer, and
-    # "complete -o default" falls back to filenames on an empty COMPREPLY.
     __kubectl_fzf_debug "No default completion function '$defaultCompletion' to fall back to"
     COMPREPLY=()
 }
 
-__kubectl_fzf_get_completion_results() {
-    local lastParam cmdArgs
-    local completionOutput fallback
+__kubectl_fzf_kubectl()
+{
+    local fallback completionOutput
+    local -a removeWords=()
 
-    # Prepare the command to request completions for the program.
-    # Calling ${words[0]} instead of directly kubectl allows to handle aliases
-    cmdArgs="${words[*]:1}"
+    __kubectl_fzf_debug
+    __kubectl_fzf_debug "========= starting completion logic =========="
+    __kubectl_fzf_debug "COMP_CWORD is ${COMP_CWORD}, COMP_WORDS[*] is ${COMP_WORDS[*]}"
 
-    lastParam=${words[$((${#words[@]}-1))]}
-    __kubectl_fzf_debug "lastParam ${lastParam}"
-
-    # When completing a flag with an = (e.g., kubectl -n=<TAB>)
-    # bash focuses on the part after the =, so we need to remove
-    # the flag part from $cur
-    if [[ "${cur}" == -*=* ]]; then
-        cur="${cur#*=}"
-    fi
-
-    # Called directly and not through $(...): the fallback is reported through a
-    # variable, which a subshell would throw away.
-    __kubectl_fzf_get_completions "$cmdArgs" "$cur"
+    # ${words[0]} goes along to the binary, so aliases need no special case here.
+    __kubectl_fzf_get_completions
 
     if [[ -n "$fallback" ]]; then
         __kubectl_fzf_default_completion
@@ -102,34 +172,8 @@ __kubectl_fzf_get_completion_results() {
         COMPREPLY=()
         return
     fi
+    # completion word splitting of the answer is unwanted; quote it wholesale.
     COMPREPLY=("$completionOutput")
-}
-
-__kubectl_fzf_kubectl()
-{
-    local cur words cword
-
-    COMPREPLY=()
-
-    # Call _init_completion from the bash-completion package
-    # to prepare the arguments properly
-    if declare -F _init_completion >/dev/null 2>&1; then
-        _init_completion -n "=:" || return
-    else
-        __kubectl_init_completion -n "=:" || return
-    fi
-
-    __kubectl_fzf_debug
-    __kubectl_fzf_debug "========= starting completion logic =========="
-    __kubectl_fzf_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
-
-    # The user could have moved the cursor backwards on the command-line.
-    # We need to trigger completion from the $cword location, so we need
-    # to truncate the command-line ($words) up to the $cword location.
-    words=("${words[@]:0:$cword+1}")
-    __kubectl_fzf_debug "Truncated words[*]: ${words[*]},"
-
-    __kubectl_fzf_get_completion_results
 }
 
 if [[ $(type -t compopt) = "builtin" ]]; then
@@ -137,5 +181,23 @@ if [[ $(type -t compopt) = "builtin" ]]; then
 else
     complete -o default -o nospace -F __kubectl_fzf_kubectl kubectl
 fi
+
+# Completion only fires for commands complete(1) knows about, so the kubectl
+# aliases defined by the time this file is sourced are registered too: their
+# first word is expanded in __kubectl_fzf_get_completions.
+while read -r aliasLine; do
+    aliasName="${aliasLine#alias }"
+    aliasName="${aliasName%%=*}"
+    aliasBody="${aliasLine#*=}"
+    aliasBody="${aliasBody#[\'\"]}"
+    aliasBody="${aliasBody%[\'\"]}"
+    if [[ "$aliasBody" == "kubectl" || "$aliasBody" == "kubectl "* ]]; then
+        if [[ $(type -t compopt) = "builtin" ]]; then
+            complete -o default -F __kubectl_fzf_kubectl "$aliasName"
+        else
+            complete -o default -o nospace -F __kubectl_fzf_kubectl "$aliasName"
+        fi
+    fi
+done < <(alias)
 
 # ex: ts=4 sw=4 et filetype=sh
