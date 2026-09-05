@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )

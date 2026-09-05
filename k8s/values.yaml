@@ -6,7 +6,7 @@ docker:
 
 image:
   kubectl_fzf_server:
-    name: bonnefoa/kubectl-fzf
+    name: rooty0/kubectl-fzf
     tag: v3
 
 resources:

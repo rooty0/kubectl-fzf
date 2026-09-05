@@ -3,7 +3,7 @@ package store
 import (
 	"time"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
 )
 
 // StoreConfig defines configuration to store

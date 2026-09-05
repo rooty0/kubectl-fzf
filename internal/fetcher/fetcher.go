@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 // Fetcher defines configuration to fetch completion datas

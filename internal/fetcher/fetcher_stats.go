@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/store"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

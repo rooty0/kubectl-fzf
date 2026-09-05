@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/fetcher"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/parse"
+	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

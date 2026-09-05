@@ -1,4 +1,4 @@
-module github.com/bonnefoa/kubectl-fzf/v3
+module github.com/rooty0/kubectl-fzf/v3
 
 go 1.24.0
 

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/store"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

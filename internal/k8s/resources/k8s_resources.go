@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

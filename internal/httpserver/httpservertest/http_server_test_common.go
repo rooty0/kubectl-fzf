@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/httpserver"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/store"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/store/storetest"
+	"github.com/rooty0/kubectl-fzf/v3/internal/httpserver"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store/storetest"
 	"github.com/stretchr/testify/require"
 )
 

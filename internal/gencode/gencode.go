@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 )
 
 func outputResourceType(apiResource resources.APIResource) {

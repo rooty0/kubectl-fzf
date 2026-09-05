@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/stretchr/testify/assert"
 )
 

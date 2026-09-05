@@ -5,8 +5,8 @@ import (
 	"os"
 	"path"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"

@@ -10,10 +10,10 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/httpserver"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resourcewatcher"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/store"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
+	"github.com/rooty0/kubectl-fzf/v3/internal/httpserver"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resourcewatcher"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

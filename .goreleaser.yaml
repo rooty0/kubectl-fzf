@@ -40,18 +40,18 @@ archives:
 
 dockers:
   - image_templates:
-    - "bonnefoa/kubectl-fzf:{{ .Tag }}"
-    - "bonnefoa/kubectl-fzf:v{{ .Major }}"
-    - "bonnefoa/kubectl-fzf:v{{ .Major }}.{{ .Minor }}"
-    - "bonnefoa/kubectl-fzf:latest"
+    - "rooty0/kubectl-fzf:{{ .Tag }}"
+    - "rooty0/kubectl-fzf:v{{ .Major }}"
+    - "rooty0/kubectl-fzf:v{{ .Major }}.{{ .Minor }}"
+    - "rooty0/kubectl-fzf:latest"
     dockerfile: Dockerfile.goreleaser
     goos: linux
     goarch: amd64
     build_flag_templates:
       - --label=org.opencontainers.image.title={{ .ProjectName }}
       - --label=org.opencontainers.image.description={{ .ProjectName }}
-      - --label=org.opencontainers.image.url=https://github.com/bonnefoa/kubectl-fzf
-      - --label=org.opencontainers.image.source=https://github.com/bonnefoa/kubectl-fzf
+      - --label=org.opencontainers.image.url=https://github.com/rooty0/kubectl-fzf
+      - --label=org.opencontainers.image.source=https://github.com/rooty0/kubectl-fzf
       - --label=org.opencontainers.image.version={{ .Version }}
       - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
       - --label=org.opencontainers.image.revision={{ .FullCommit }}
@@ -64,7 +64,7 @@ snapshot:
   name_template: "{{ .Tag }}-next"
 release:
   github:
-    owner: bonnefoa
+    owner: rooty0
     name: kubectl-fzf
   draft: true
   prerelease: auto

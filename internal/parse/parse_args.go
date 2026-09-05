@@ -3,7 +3,7 @@ package parse
 import (
 	"strings"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/sirupsen/logrus"
 )
 

@@ -3,7 +3,7 @@ package resources
 import (
 	"fmt"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/util"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 )

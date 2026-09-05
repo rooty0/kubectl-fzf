@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/fetcher"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
 	"github.com/stretchr/testify/require"
 )
 

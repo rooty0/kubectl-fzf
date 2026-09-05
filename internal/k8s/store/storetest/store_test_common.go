@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/clusterconfig"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/store"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/fetcher/fetchertest"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/httpserver/httpservertest"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/parse"
+	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher/fetchertest"
+	"github.com/rooty0/kubectl-fzf/v3/internal/httpserver/httpservertest"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
 	"github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"

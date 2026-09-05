@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/fetcher"
-	"github.com/bonnefoa/kubectl-fzf/v3/internal/parse"
+	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
+	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
 	"github.com/pkg/errors"
 )
 
