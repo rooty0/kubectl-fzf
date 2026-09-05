@@ -9,11 +9,11 @@ Hello! 👋 This repository is a maintained fork of the original project at
 
 I attempted to reach out to the original author but haven't received a reply, so I decided to continue the work here to keep the project alive and updated.
 
-The `fork` branch is now the primary branch - that's where all new development and fixes happen. The `main` branch is kept in sync with upstream, just in case the original project becomes active again. 
+The `main` branch is the primary branch - that's where all new development and fixes happen.
 
-If you'd like to contribute, please make sure to open your pull requests against the `fork` branch.
+If you'd like to contribute, please make sure to open your pull requests against the `main` branch.
 
-I'm not planning to maintain the GitHub Releases page the way it was done upstream. Instead, please refer to the section below for instructions on how to build the project - it's super easy.
+I'm not planning to maintain the GitHub Releases page the way it was done upstream. Use `go install` as described below, or build from source - it's super easy.
 
 Table of Contents
 =================
@@ -59,30 +59,36 @@ Table of Contents
 
 ## kubectl-fzf binaries
 
-The original `go install` method won't work because the `go.mod` file references the upstream module path.
-Instead, just build the binaries for your architecture locally - it's extremely easy.
+The easiest way is `go install`:
 
 ```shell
-brew install go # Ensure Go is installed first. If you're not on macOS, download it here: https://go.dev/doc/install
+brew install go # Ensure Go is installed first (>= 1.24). If you're not on macOS, download it here: https://go.dev/doc/install
+go install github.com/rooty0/kubectl-fzf/v3/cmd/kubectl-fzf-completion@latest
+go install github.com/rooty0/kubectl-fzf/v3/cmd/kubectl-fzf-server@latest
+```
+
+Or build locally from source - it's extremely easy:
+
+```shell
 git clone --depth 1 https://github.com/rooty0/kubectl-fzf.git && cd kubectl-fzf
 make build # Run to generate the two binaries: kubectl-fzf-completion and kubectl-fzf-server
 ```
 
 Note: Use `kubectl-fzf-server` only if you want to run the server locally
 
-Make sure `kubectl-fzf-completion` is in your `$PATH`, as this is what your shell executes
+Make sure `kubectl-fzf-completion` is in your `$PATH`, as this is what your shell executes (`go install` places it in `$(go env GOPATH)/bin`)
 
 ## Shell autocompletion
 
 Source the autocompletion functions:
 ```
 # bash version
-wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/fork/shell/kubectl_fzf.bash -O ~/.kubectl_fzf.bash
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.bash -O ~/.kubectl_fzf.bash
 echo "source <(kubectl completion bash)" >> ~/.bashrc
 echo "source ~/.kubectl_fzf.bash" >> ~/.bashrc
 
 # zsh version
-wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/fork/shell/kubectl_fzf.plugin.zsh -O ~/.kubectl_fzf.plugin.zsh
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/shell/kubectl_fzf.plugin.zsh -O ~/.kubectl_fzf.plugin.zsh
 echo "source <(kubectl completion zsh)" >> ~/.zshrc
 echo "source ~/.kubectl_fzf.plugin.zsh" >> ~/.zshrc
 ```
@@ -92,7 +98,7 @@ echo "source ~/.kubectl_fzf.plugin.zsh" >> ~/.zshrc
 You can use [antigen](https://github.com/zsh-users/antigen) to load it as a zsh plugin
 ```shell
 antigen bundle robbyrussell/oh-my-zsh plugins/docker
-antigen bundle rooty0/kubectl-fzf@fork shell/
+antigen bundle rooty0/kubectl-fzf shell/
 ```
 
 ## kubectl-fzf-server
@@ -101,12 +107,12 @@ antigen bundle rooty0/kubectl-fzf@fork shell/
 
 You can deploy `kubectl-fzf-server` as a pod in your cluster.
 
-From the [k8s directory](https://github.com/rooty0/kubectl-fzf/tree/fork/k8s):
+From the [k8s directory](https://github.com/rooty0/kubectl-fzf/tree/main/k8s):
 ```shell
 helm template --namespace myns --set image.kubectl_fzf_server.tag=v3 --set toleration=aToleration . | kubectl apply -f -
 ```
 
-You can check the latest image version [here](https://cloud.docker.com/repository/docker/bonnefoa/kubectl-fzf/general).
+You can check the latest image version [here](https://hub.docker.com/r/rooty0/kubectl-fzf).
 
 ### Install kubectl-fzf-server as a service
 
@@ -115,7 +121,7 @@ You can install `kubectl-fzf-server` as a systemd unit server.
 ```
 # Create user systemd config
 mkdir -p ~/.config/systemd/user
-wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/fork/systemd/kubectl_fzf_server.service -O ~/.config/systemd/user/kubectl_fzf_server.service
+wget https://raw.githubusercontent.com/rooty0/kubectl-fzf/main/service/systemd/kubectl_fzf_server.service -O ~/.config/systemd/user/kubectl_fzf_server.service
 # Set fullpath of kubectl-fzf-server
 sed -i "s#INSTALL_PATH#$GOPATH/bin#" ~/.config/systemd/user/kubectl_fzf_server.service
 
