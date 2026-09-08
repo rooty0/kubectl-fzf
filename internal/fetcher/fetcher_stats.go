@@ -36,7 +36,7 @@ func (f *Fetcher) getStatsFromPortForward(ctx context.Context) ([]*store.Stats, 
 
 func (f *Fetcher) GetStats(ctx context.Context) ([]*store.Stats, error) {
 	// TODO Handle local file
-	if util.IsAddressReachable(f.httpEndpoint) {
+	if util.IsAddressReachable(ctx, f.httpEndpoint) {
 		url := fmt.Sprintf("http://%s/%s", f.httpEndpoint, "stats")
 		return f.getStatsFromHttpServer(ctx, url)
 	}

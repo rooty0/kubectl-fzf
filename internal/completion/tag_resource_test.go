@@ -14,7 +14,7 @@ import (
 func TestTagLabel(t *testing.T) {
 	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
 	labelMap, err := getTagResourceOccurrences(context.Background(), resources.ResourceTypePod, nil, fetchConfig, TagTypeLabel)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Log(labelMap)
 
 	assert.Contains(t, labelMap, TagResourceKey{"kube-system", "k8s-app=kube-dns"})
@@ -26,14 +26,14 @@ func TestLabelNamespaceFiltering(t *testing.T) {
 	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
 	namespace := "default"
 	labelMap, err := getTagResourceOccurrences(context.Background(), resources.ResourceTypePod, &namespace, fetchConfig, TagTypeLabel)
-	assert.NoError(t, err)
-	assert.Len(t, labelMap, 0)
+	require.NoError(t, err)
+	assert.Empty(t, labelMap)
 }
 
 func TestLabelCompletionPod(t *testing.T) {
 	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
 	labelHeader, labelComps, err := GetTagResourceCompletion(context.Background(), resources.ResourceTypePod, nil, fetchConfig, TagTypeLabel)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, labelComps, 12)
 
 	t.Log(labelComps)
@@ -45,7 +45,7 @@ func TestLabelCompletionPod(t *testing.T) {
 func TestLabelCompletionNode(t *testing.T) {
 	fetchConfig := fetchertest.GetTestFetcherWithDefaults(t)
 	labelHeader, labelComps, err := GetTagResourceCompletion(context.Background(), resources.ResourceTypeNode, nil, fetchConfig, TagTypeLabel)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, labelComps, 12)
 
 	t.Log(labelComps)

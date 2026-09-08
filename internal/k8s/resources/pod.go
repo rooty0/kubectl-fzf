@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 // Pod is the summary of a kubernetes pod
@@ -80,7 +81,7 @@ func (p *Pod) FromRuntime(obj interface{}, config CtorConfig) {
 	volumes := spec.Volumes
 	for _, v := range volumes {
 		if v.PersistentVolumeClaim != nil {
-			fullClaimName := fmt.Sprintf("%s/%s", p.ResourceMeta.Namespace,
+			fullClaimName := fmt.Sprintf("%s/%s", p.Namespace,
 				v.PersistentVolumeClaim.ClaimName)
 			p.Claims = append(p.Claims, fullClaimName)
 		}
@@ -92,11 +93,12 @@ func (p *Pod) FromRuntime(obj interface{}, config CtorConfig) {
 			continue
 		}
 		var toleration string
-		if v.Operator == "Equal" {
+		switch {
+		case v.Operator == "Equal":
 			toleration = fmt.Sprintf("%s=%s:%s", v.Key, v.Value, v.Effect)
-		} else if v.Key == "" {
+		case v.Key == "":
 			toleration = "Exists"
-		} else {
+		default:
 			toleration = fmt.Sprintf("%s:%s", v.Key, v.Effect)
 		}
 		p.Tolerations = append(p.Tolerations, toleration)

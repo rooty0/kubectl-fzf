@@ -5,14 +5,15 @@ import (
 	"os"
 	"runtime/pprof"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/httpserver"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resourcewatcher"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
 	"github.com/rooty0/kubectl-fzf/v3/internal/kubectlfzfserver"
 	"github.com/rooty0/kubectl-fzf/v3/internal/util"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )

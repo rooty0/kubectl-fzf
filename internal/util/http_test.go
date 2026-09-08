@@ -2,7 +2,6 @@ package util
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -51,7 +50,7 @@ func TestGetFromHttpServerTimeout(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, context.DeadlineExceeded), "expected deadline exceeded, got %v", err)
+	require.ErrorIs(t, err, context.DeadlineExceeded, "expected deadline exceeded, got %v", err)
 	assert.Less(t, elapsed, 2*time.Second, "the get must fail fast instead of hanging")
 }
 
@@ -79,6 +78,6 @@ func TestHeadFromHttpServerTimeout(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, context.DeadlineExceeded), "expected deadline exceeded, got %v", err)
+	require.ErrorIs(t, err, context.DeadlineExceeded, "expected deadline exceeded, got %v", err)
 	assert.Less(t, elapsed, 2*time.Second, "the head must fail fast instead of hanging")
 }

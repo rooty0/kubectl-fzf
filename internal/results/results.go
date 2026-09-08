@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
 	"github.com/rooty0/kubectl-fzf/v3/internal/util"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
 )
 
 // Result is what the shell has to apply to the command line.
@@ -39,7 +40,7 @@ func ProcessResult(cmdUse string, cmdArgs []string, cursor int,
 
 func parseNamespaceFlag(cmdArgs []string) (*string, error) {
 	fs := pflag.NewFlagSet("f1", pflag.ContinueOnError)
-	fs.ParseErrorsWhitelist.UnknownFlags = true
+	fs.ParseErrorsAllowlist.UnknownFlags = true
 	cmdNamespace := fs.StringP("namespace", "n", "", "")
 	logrus.Debugf("Parsing namespace from %v", cmdArgs)
 	err := fs.Parse(cmdArgs)

@@ -238,10 +238,11 @@ func processCommandArgsWithFetchConfig(
 		}
 	}
 
-	if flagCompletion == parse.FlagLabel {
+	switch flagCompletion {
+	case parse.FlagLabel:
 		completionResult.Header, completionResult.Completions, err = GetTagResourceCompletion(ctx, resourceType, namespace, fetchConfig, TagTypeLabel)
 		return completionResult, err
-	} else if flagCompletion == parse.FlagFieldSelector {
+	case parse.FlagFieldSelector:
 		completionResult.Header, completionResult.Completions, err = GetTagResourceCompletion(ctx, resourceType, namespace, fetchConfig, TagTypeFieldSelector)
 		return completionResult, err
 	}

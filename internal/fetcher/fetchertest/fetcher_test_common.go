@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
-	"github.com/stretchr/testify/require"
 )
 
 func GetTestFetcher(t *testing.T, clusterName string, port int) (*fetcher.Fetcher, string) {

@@ -89,6 +89,7 @@ func NewResourceWatcher(cluster string, resourceWatcherCli ResourceWatcherCli, s
 
 // Start begins the watch/poll of a given k8s resource
 func (r *ResourceWatcher) Start(parentCtx context.Context, cfg WatchConfig) *store.Store {
+	//nolint:gosec // G118: cancel is stored in r.cancelFuncs below and invoked by Stop; deferred, not leaked
 	ctx, cancel := context.WithCancel(parentCtx)
 	r.cancelFuncs = append(r.cancelFuncs, cancel)
 	resourceStore := store.NewStore(ctx, r.storeConfig, r.ctorConfig, cfg.resourceType)
@@ -239,7 +240,7 @@ func (r *ResourceWatcher) DumpAPIResources() error {
 	return err
 }
 
-func (r *ResourceWatcher) getCacheListWatch(cfg WatchConfig, store *store.Store, namespace string) *cache.ListWatch {
+func (r *ResourceWatcher) getCacheListWatch(cfg WatchConfig, namespace string) *cache.ListWatch {
 	optionsModifier := func(options *metav1.ListOptions) {
 		options.FieldSelector = fields.Everything().String()
 		options.ResourceVersion = "0"
@@ -255,7 +256,7 @@ func (r *ResourceWatcher) pollResource(
 	store *store.Store,
 ) {
 	logrus.Infof("Start poller for %s", cfg.resourceType)
-	cacheListWatch := r.getCacheListWatch(cfg, store, "")
+	cacheListWatch := r.getCacheListWatch(cfg, "")
 	r.doPoll(ctx, cacheListWatch, store)
 	ticker := time.NewTicker(cfg.pollingPeriod)
 	for {
@@ -276,7 +277,7 @@ func (r *ResourceWatcher) startWatch(
 	stop chan struct{},
 	stopFunc func(),
 ) {
-	cacheListWatch := r.getCacheListWatch(cfg, store, namespace)
+	cacheListWatch := r.getCacheListWatch(cfg, namespace)
 	resourceHandlers := cache.ResourceEventHandlerFuncs{
 		AddFunc:    store.AddResource,
 		DeleteFunc: store.DeleteResource,
@@ -296,7 +297,7 @@ func (r *ResourceWatcher) startWatch(
 		}
 		if errors.IsForbidden(err) {
 			logrus.Warnf("Resource %s is forbidden, stopping watcher. err: %s", cfg.resourceType, err)
-			//close(stop)
+			// close(stop)
 			// one owner for each stop channel
 			stopFunc()
 		}
@@ -338,7 +339,7 @@ func (r *ResourceWatcher) watchResource(
 	}
 	<-ctx.Done()
 	logrus.Infof("Exiting watch of %s namespace %s", resourceType, namespaces)
-	//close(stop)
+	// close(stop)
 	// No matter how many goroutines call stopFunc(), the underlying close(stop) only runs once
 	//  thanks to sync.Once, so the close of closed channel panic disappears
 	stopFunc()

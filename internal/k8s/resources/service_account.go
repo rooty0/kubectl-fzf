@@ -3,8 +3,9 @@ package resources
 import (
 	"strconv"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 // ServiceAccount is the summary of a kubernetes service account

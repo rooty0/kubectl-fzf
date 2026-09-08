@@ -4,8 +4,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/sirupsen/logrus"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 )
 
 func (f *Fetcher) checkLocalFiles(r resources.ResourceType) (map[string]resources.K8sResource, error) {
@@ -15,7 +16,7 @@ func (f *Fetcher) checkLocalFiles(r resources.ResourceType) (map[string]resource
 		return nil, nil
 	}
 
-	deltaMod := time.Now().Sub(finfo.ModTime())
+	deltaMod := time.Since(finfo.ModTime())
 	logrus.Infof("%s found, using resources from file", resourceStorePath)
 	if deltaMod >= time.Hour {
 		logrus.Warnf("%s was not modified for more than one hour", resourceStorePath)

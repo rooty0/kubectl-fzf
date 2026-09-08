@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+// NoneValue is the display sentinel for "nothing to show" in dumps; rather
+// than sprinkling the literal through resources and util, it lives here since
+// util's joiners are its main producers.
+const NoneValue = "None"
+
 // IsStringExcluded returns true if one of the regexp match the input string
 func IsStringExcluded(s string, regexps []*regexp.Regexp) bool {
 	for _, regexp := range regexps {
@@ -33,7 +38,7 @@ func IsStringIncluded(s string, regexps []*regexp.Regexp) bool {
 func DumpLine(lst []string) string {
 	for k, v := range lst {
 		if v == "" {
-			lst[k] = "None"
+			lst[k] = NoneValue
 		}
 	}
 	line := strings.Join(lst, "\t")
@@ -73,7 +78,7 @@ func StringMapsEqual(a map[string]string, b map[string]string) bool {
 // JoinSlicesWithMaxOrNone joins a slice of string with separator up to x elements. Display None if there's no elements
 func JoinSlicesWithMaxOrNone(sl []string, max int, sep string) string {
 	if len(sl) == 0 {
-		return "None"
+		return NoneValue
 	}
 	if len(sl) < max {
 		return strings.Join(sl, sep)
@@ -86,7 +91,7 @@ func JoinSlicesWithMaxOrNone(sl []string, max int, sep string) string {
 // JoinSlicesOrNone joins a slice of string with separator or display None if there's no elements
 func JoinSlicesOrNone(sl []string, sep string) string {
 	if len(sl) == 0 {
-		return "None"
+		return NoneValue
 	}
 	return strings.Join(sl, sep)
 }

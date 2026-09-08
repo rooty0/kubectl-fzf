@@ -3,22 +3,22 @@ package store
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 func TestMain(m *testing.M) {
@@ -39,11 +39,10 @@ func TestDumpAPIResources(t *testing.T) {
 	list.ApiResources = append(list.ApiResources, a)
 
 	resource["v1"] = &list
-	tempDir, err := ioutil.TempDir("/tmp/", "cacheTest")
-	require.NoError(t, err)
+	tempDir := t.TempDir()
 
 	apiResourcesFilePath := path.Join(tempDir, "apiresources")
-	err = util.EncodeToFile(resource, apiResourcesFilePath)
+	err := util.EncodeToFile(resource, apiResourcesFilePath)
 	require.NoError(t, err)
 
 	loadResource := map[string]resources.K8sResource{}
@@ -56,9 +55,7 @@ func TestDumpAPIResources(t *testing.T) {
 // whole map. Most HasChanged implementations type-assert their argument, so
 // handing them the nil of a missing key used to panic the whole server.
 func TestUpdateResourceOfUnknownKey(t *testing.T) {
-	tempDir, err := ioutil.TempDir("/tmp/", "cacheTest")
-	require.NoError(t, err)
-	defer util.RemoveTempDir(tempDir)
+	tempDir := t.TempDir()
 
 	storeConfig := NewStoreConfig(&StoreConfigCli{
 		ClusterConfigCli: &clusterconfig.ClusterConfigCli{
@@ -86,9 +83,7 @@ func TestUpdateResourceOfUnknownKey(t *testing.T) {
 // while a watch handler writes to it takes the whole server down with a fatal
 // "concurrent map iteration and map write".
 func TestConcurrentAccess(t *testing.T) {
-	tempDir, err := ioutil.TempDir("/tmp/", "cacheTest")
-	require.NoError(t, err)
-	defer util.RemoveTempDir(tempDir)
+	tempDir := t.TempDir()
 
 	storeConfig := NewStoreConfig(&StoreConfigCli{
 		ClusterConfigCli: &clusterconfig.ClusterConfigCli{
@@ -137,9 +132,7 @@ func TestConcurrentAccess(t *testing.T) {
 // changes, so a ticker that ignores its context leaks a goroutine and keeps
 // the whole resource map of the discarded store alive.
 func TestFullDumpTickerStopsOnContextCancel(t *testing.T) {
-	tempDir, err := ioutil.TempDir("/tmp/", "cacheTest")
-	require.NoError(t, err)
-	defer util.RemoveTempDir(tempDir)
+	tempDir := t.TempDir()
 
 	storeConfig := NewStoreConfig(&StoreConfigCli{
 		ClusterConfigCli: &clusterconfig.ClusterConfigCli{

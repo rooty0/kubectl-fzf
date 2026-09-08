@@ -8,14 +8,18 @@ import (
 	"time"
 
 	"net/http"
+	//nolint:gosec // G108: the pprof endpoints are the point — they are the
+	// documented profiling interface, and they bind to localhost inside the
+	// pod only.
 	_ "net/http/pprof"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/rooty0/kubectl-fzf/v3/internal/httpserver"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resourcewatcher"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
 	"github.com/rooty0/kubectl-fzf/v3/internal/util"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func startWatchOnCluster(ctx context.Context,
@@ -85,8 +89,14 @@ func StartKubectlFzfServer() {
 		logrus.Fatalf("Error starting http server: %s", err)
 	}
 
+	// Profiling endpoint, localhost-only; ReadHeaderTimeout satisfies the
+	// Slowloris hardening without hurting long-lived pprof scrapes.
+	pprofServer := &http.Server{
+		Addr:              "localhost:6060",
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	go func() {
-		logrus.Println(http.ListenAndServe("localhost:6060", nil))
+		logrus.Println(pprofServer.ListenAndServe())
 	}()
 
 	currentContext := storeConfig.GetContext()

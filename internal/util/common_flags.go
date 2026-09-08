@@ -1,6 +1,7 @@
 package util
 
 import (
+	"errors"
 	"flag"
 	"os"
 	"runtime/pprof"
@@ -25,7 +26,9 @@ func CommonInitialization() {
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		pprof.StartCPUProfile(f)
+		if err := pprof.StartCPUProfile(f); err != nil {
+			logrus.Fatal(err)
+		}
 	}
 }
 
@@ -42,7 +45,11 @@ func ConfigureViper() {
 	viper.AddConfigPath("/etc/kubectl_fzf/")
 	viper.AddConfigPath("$HOME")
 	err = viper.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+
+	// A missing config file is fine (all settings have defaults and env
+	// overrides); anything else means the given config was unreadable.
+	var configFileNotFoundError viper.ConfigFileNotFoundError
+	if !errors.As(err, &configFileNotFoundError) {
 		FatalIf(err)
 	}
 }

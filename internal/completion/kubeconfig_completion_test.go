@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher/fetchertest"
 	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
-	"github.com/stretchr/testify/require"
 )
 
 func TestProcessContext(t *testing.T) {

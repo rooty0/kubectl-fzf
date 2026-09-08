@@ -32,7 +32,7 @@ func (h *HorizontalPodAutoscaler) FromRuntime(obj interface{}, config CtorConfig
 	h.Reference = fmt.Sprintf("%s/%s",
 		hpa.Spec.ScaleTargetRef.Kind,
 		hpa.Spec.ScaleTargetRef.Name)
-	h.MinPods = "None"
+	h.MinPods = util.NoneValue
 	if hpa.Spec.MinReplicas != nil {
 		h.MinPods = fmt.Sprintf("%d", *hpa.Spec.MinReplicas)
 	}

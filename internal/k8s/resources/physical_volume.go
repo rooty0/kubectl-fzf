@@ -35,7 +35,7 @@ func (pv *PersistentVolume) FromRuntime(obj interface{}, config CtorConfig) {
 	var ok bool
 	pv.Zone, ok = pv.Labels["failure-domain.beta.kubernetes.io/zone"]
 	if !ok {
-		pv.Zone = "None"
+		pv.Zone = util.NoneValue
 	}
 	spec := pvFromRuntime.Spec
 	if spec.AWSElasticBlockStore != nil {
@@ -44,7 +44,7 @@ func (pv *PersistentVolume) FromRuntime(obj interface{}, config CtorConfig) {
 		pv.Volume = spec.GCEPersistentDisk.PDName
 	}
 	pv.StorageClass = spec.StorageClassName
-	pv.Claim = "None"
+	pv.Claim = util.NoneValue
 	if pvFromRuntime.Spec.ClaimRef != nil {
 		pv.Claim = fmt.Sprintf("%s/%s", spec.ClaimRef.Namespace, spec.ClaimRef.Name)
 	}

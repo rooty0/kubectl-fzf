@@ -4,9 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestFileStoreExists(t *testing.T) {

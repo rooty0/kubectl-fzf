@@ -9,6 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/completion"
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
 	"github.com/rooty0/kubectl-fzf/v3/internal/fzf"
@@ -19,9 +23,6 @@ import (
 	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
 	"github.com/rooty0/kubectl-fzf/v3/internal/results"
 	"github.com/rooty0/kubectl-fzf/v3/internal/util"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -86,13 +87,16 @@ func completeFun(cmd *cobra.Command, cmdArgs []string) {
 	}
 
 	completionResults, err := completion.ProcessCommandArgs(firstWord, args, cursor, f)
-	if e, ok := err.(resources.UnknownResourceError); ok {
-		logrus.Warnf("Unknown resource type: %s", e)
+	var unknownResourceErr resources.UnknownResourceError
+	var unmanagedFlagErr parse.UnmanagedFlagError
+	switch {
+	case errors.As(err, &unknownResourceErr):
+		logrus.Warnf("Unknown resource type: %s", unknownResourceErr)
 		os.Exit(FallbackExitCode)
-	} else if e, ok := err.(parse.UnmanagedFlagError); ok {
-		logrus.Warnf("Unmanaged flag: %s", e)
+	case errors.As(err, &unmanagedFlagErr):
+		logrus.Warnf("Unmanaged flag: %s", unmanagedFlagErr)
 		os.Exit(FallbackExitCode)
-	} else if err != nil {
+	case err != nil:
 		logrus.Warnf("Error during completion: %s", err)
 		os.Exit(FallbackExitCode)
 	}

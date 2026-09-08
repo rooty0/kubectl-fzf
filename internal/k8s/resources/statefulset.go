@@ -3,8 +3,9 @@ package resources
 import (
 	"fmt"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	appsv1 "k8s.io/api/apps/v1"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 // StatefulSet is the summary of a kubernetes statefulset

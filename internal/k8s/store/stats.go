@@ -48,6 +48,7 @@ func GetStatsOutput(stats []*Stats) string {
 			fmt.Fprintln(w, line)
 		}
 	}
-	w.Flush()
+	// Writing to a strings.Builder never fails; the underscore says so.
+	_ = w.Flush()
 	return b.String()
 }

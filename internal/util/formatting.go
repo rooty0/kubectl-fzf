@@ -15,6 +15,8 @@ func FormatCompletion(lines []string) string {
 	for _, line := range lines {
 		fmt.Fprintln(w, line)
 	}
-	w.Flush()
+	// Writing to a strings.Builder never fails, but say so rather than let the
+	// error silently drop.
+	_ = w.Flush()
 	return b.String()
 }

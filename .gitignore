@@ -125,6 +125,7 @@ fabric.properties
 # Custom
 .idea/
 .vscode/
+bin/
 dist/
 kubeconfig
 # Credential-free kubeconfig fixtures the tests need

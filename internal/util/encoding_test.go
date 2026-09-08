@@ -2,8 +2,6 @@ package util
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -16,15 +14,13 @@ import (
 func TestEncoding(t *testing.T) {
 	data := "test"
 
-	f, err := ioutil.TempFile("", "encoding")
-	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	filePath := filepath.Join(t.TempDir(), "encoding")
 
-	err = EncodeToFile(data, f.Name())
+	err := EncodeToFile(data, filePath)
 	require.NoError(t, err)
 
 	var res string
-	err = LoadGobFromFile(&res, f.Name())
+	err = LoadGobFromFile(&res, filePath)
 	require.NoError(t, err)
 	assert.Equal(t, "test", res)
 }

@@ -2,18 +2,20 @@ package storetest
 
 import (
 	"context"
-	"io/ioutil"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/store"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// labelApp is the label key the storetest fixtures organize pods by.
+const labelApp = "app"
 
 func podResource(name string, ns string, labels map[string]string) corev1.Pod {
 	meta := corev1.Pod{
@@ -31,25 +33,23 @@ func podResource(name string, ns string, labels map[string]string) corev1.Pod {
 }
 
 func GetTestPodStore(t *testing.T) (string, *store.Store) {
-	tempDir, err := ioutil.TempDir("/tmp/", "cacheTest")
-	assert.Nil(t, err)
+	tempDir := t.TempDir()
 	storeConfigCli := &store.StoreConfigCli{
 		ClusterConfigCli: &clusterconfig.ClusterConfigCli{
 			ClusterName: "test", CacheDir: tempDir},
 		TimeBetweenFullDump: 500 * time.Millisecond}
 	storeConfig := store.NewStoreConfig(storeConfigCli)
-	err = storeConfig.CreateDestDir()
+	err := storeConfig.CreateDestDir()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	ctorConfig := resources.CtorConfig{}
 	k8sStore := store.NewStore(ctx, storeConfig, ctorConfig, resources.ResourceTypePod)
-	assert.Nil(t, err)
 	pods := []corev1.Pod{
-		podResource("Test1", "ns1", map[string]string{"app": "app1"}),
-		podResource("Test2", "ns2", map[string]string{"app": "app2"}),
-		podResource("Test3", "ns2", map[string]string{"app": "app2"}),
-		podResource("Test4", "aaa", map[string]string{"app": "app3"}),
+		podResource("Test1", "ns1", map[string]string{labelApp: "app1"}),
+		podResource("Test2", "ns2", map[string]string{labelApp: "app2"}),
+		podResource("Test3", "ns2", map[string]string{labelApp: "app2"}),
+		podResource("Test4", "aaa", map[string]string{labelApp: "app3"}),
 	}
 	for _, pod := range pods {
 		k8sStore.AddResource(&pod)

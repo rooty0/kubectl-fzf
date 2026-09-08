@@ -3,9 +3,10 @@ package resources
 import (
 	"strings"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/batch/v1"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 // CronJob is the summary of a kubernetes cronJob

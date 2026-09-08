@@ -1,0 +1,107 @@
+# golangci-lint configuration, v2 format (requires golangci-lint v2).
+# The version is pinned in .github/workflows/ci.yml; upgrade both together.
+version: "2"
+
+run:
+  # Cap total analysis time so a pathological run cannot hang CI forever.
+  timeout: 5m
+
+linters:
+  # Start from the well-established standard set (errcheck, govet,
+  # ineffassign, staticcheck, unused) and opt in to additional linters.
+  # Deliberately NOT `default: all`: a new or changed linter in an upgraded
+  # golangci-lint release would start failing CI with no code change on our
+  # side (this is exactly what the golangci-lint docs warn against).
+  default: standard
+  enable:
+    - bodyclose    # HTTP response bodies must be closed (fetcher/httpserver do HTTP calls)
+    - copyloopvar  # stale copies of loop variables (Go 1.22+ semantics)
+    - dupword      # accidental repeated words in comments and strings
+    - errorlint    # misuse of %w/errors.Is/errors.As (project uses pkg/errors + fmt)
+    - goconst      # string literals repeated enough to deserve a constant
+    - gocritic     # bug/perf/style diagnostics beyond govet
+    - gosec        # security issues (this tool shells out to kubectl, writes cache files)
+    - misspell     # misspelled English words in comments
+    - nakedret     # naked returns in long functions
+    - noctx        # HTTP requests without a context cannot be cancelled
+    - nolintlint   # keeps //nolint directives minimal and accurate
+    - revive       # golint's maintained successor (style + exported docs)
+    - unconvert    # type conversions that change nothing
+    - unparam      # parameters/returns every caller ignores
+    - usestdlibvars # raw strings/ints where the stdlib has a named constant
+    - whitespace   # stray blank lines at block boundaries
+    # nilerr and nilnil are intentionally NOT enabled: the fetcher/cache code
+    # uses the "return nil, nil" idiom to mean "no cache available yet", not a
+    # bug. Enforcing those linters would mean rewriting the internal cache
+    # contract; golangci-lint's own config leaves them off for the same class
+    # of false positives.
+    # Test-focused linters — the suite is testify-heavy, keep them honest:
+    - testifylint  # testify usage (expected/actual order, require vs assert, ...)
+    - usetesting   # t.TempDir/t.Setenv instead of os.* equivalents
+  settings:
+    goconst:
+      # Repeated literals in test files are fixture data, not logic drift —
+      # and reports on them are already excluded below, so stop them from
+      # contributing to occurrence counts too. Without this, `--context`
+      # appearing 13 times across tests would force a constant the production
+      # code only uses twice.
+      ignore-tests: true
+    nolintlint:
+      # An unused directive means the underlying issue was fixed and the
+      # blanket suppression stayed; require naming the linter so a nolint
+      # never silences more than intended.
+      allow-unused: false
+      require-specific: true
+    revive:
+      # Only one rule beyond revive's default set; it adds real signal here.
+      # unused-parameter and unused-receiver stay off: this codebase is full
+      # of informer callbacks and resource-type dispatchers where the
+      # signature is dictated by an interface and the parameter name is the
+      # documentation, so those rules produce only noise.
+      rules:
+        - name: indent-error-flow
+  exclusions:
+    # Warn when an exclusion rule matches nothing, so the file cannot rot.
+    warn-unused: true
+    # Predefined, community-curated exclusions for well-known false positives.
+    presets:
+      - comments               # missing doc comments (ST1000, revive exported-comment...)
+      - common-false-positives # gosec G103/G204/G304 noise
+      - std-error-handling     # errcheck on fmt.Print*/Close/Setenv-style calls
+    rules:
+      # Test files deliberately use repeated literals (fixture names,
+      # `--context minikube` strings) and hardcoded local ports — forcing
+      # constants/audited-crypto there buys nothing and buries the intent.
+      # dupword is off in tests because they contain tab-separated expected
+      # completion lines ("minikube\tminikube\t...") that look like repeated
+      # words but are actually structured data.
+      - path: '(.+)_test\.go'
+        linters:
+          - goconst
+          - gosec
+          - dupword
+      # corev1.Endpoints is deprecated upstream (v1.33+) but completing the
+      # endpoints resource type is a user-facing feature of this tool, not
+      # something we control. Migrating to EndpointSlice is a separate,
+      # deliberate change — not a lint drive-by.
+      - linters:
+          - staticcheck
+        text: "SA1019: corev1.Endpoints is deprecated"
+      # These two files are pure lookup tables (kubectl verb/flag names and
+      # the resource-type string mapping). The literals there are data —
+      # hoisting them into constants would alias kubectl's CLI vocabulary
+      # without preventing any drift: behaviour is asserted in tests.
+      - path: (internal/parse/kubectl_flags\.go|internal/k8s/resources/resource_type\.go)
+        linters:
+          - goconst
+
+formatters:
+  # goimports keeps import grouping deterministic; local-prefixes puts the
+  # module's own imports in their own group, matching existing code style.
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/rooty0/kubectl-fzf/v3

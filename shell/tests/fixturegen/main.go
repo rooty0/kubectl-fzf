@@ -52,7 +52,7 @@ func main() {
 	}
 
 	dir := filepath.Join(*out, *contextName)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		log.Fatal(err)
 	}
 	if err := util.EncodeToFile(data, filepath.Join(dir, "pods")); err != nil {

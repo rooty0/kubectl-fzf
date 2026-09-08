@@ -5,10 +5,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher/fetchertest"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher/fetchertest"
 )
 
 func TestMain(m *testing.M) {

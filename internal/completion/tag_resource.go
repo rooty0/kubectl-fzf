@@ -1,6 +1,7 @@
 package completion
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
-	"golang.org/x/net/context"
 )
 
 type TagType int64

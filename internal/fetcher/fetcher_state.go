@@ -63,7 +63,8 @@ func (f *FetcherState) writeToDisk() error {
 		logrus.Errorf("Error while marshalling json; %s", err)
 		return err
 	}
-	return os.WriteFile(f.statePath, b, 0644)
+	// State holds last-modified times only, but it is user-owned either way.
+	return os.WriteFile(f.statePath, b, 0o600)
 }
 
 func (f *FetcherState) getLastModifiedTime(context string, r resources.ResourceType) *time.Time {

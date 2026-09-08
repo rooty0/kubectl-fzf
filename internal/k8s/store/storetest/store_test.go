@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 func TestMain(m *testing.M) {
@@ -49,7 +50,7 @@ func TestDumpPodFullState(t *testing.T) {
 	err = util.LoadGobFromFile(&pods, podFilePath)
 	require.NoError(t, err)
 
-	assert.Equal(t, 4, len(pods))
+	assert.Len(t, pods, 4)
 	assert.Contains(t, pods, "ns1_Test1")
 	assert.Contains(t, pods, "ns2_Test2")
 	assert.Contains(t, pods, "ns2_Test3")
@@ -64,7 +65,7 @@ func TestTickerPodDumpFullState(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return loadDumpedPods(t, podFilePath) != nil
 	}, 5*time.Second, 50*time.Millisecond, "ticker should dump the cache file")
-	assert.Equal(t, 4, len(loadDumpedPods(t, podFilePath)))
+	assert.Len(t, loadDumpedPods(t, podFilePath), 4)
 
 	pod := podResource("Test5", "ns3", map[string]string{"app": "app5"})
 	s.AddResource(&pod)

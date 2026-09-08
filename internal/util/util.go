@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"runtime/debug"
@@ -14,16 +15,18 @@ type stackTracer interface {
 	StackTrace() errors.StackTrace
 }
 
-func IsAddressReachable(address string) bool {
+func IsAddressReachable(ctx context.Context, address string) bool {
 	if address == "" {
 		return false
 	}
-	conn, err := net.DialTimeout("tcp", address, time.Second)
+	dialer := net.Dialer{Timeout: time.Second}
+	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
 		logrus.Infof("Couldn't connect to %s: %s", address, err)
 		return false
 	}
-	conn.Close()
+	// Nothing useful to do with a close error on a probe connection.
+	_ = conn.Close()
 	return true
 }
 

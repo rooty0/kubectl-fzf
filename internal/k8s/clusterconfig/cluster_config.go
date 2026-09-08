@@ -5,14 +5,15 @@ import (
 	"os"
 	"path"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 type ClusterConfig struct {
@@ -76,7 +77,7 @@ func (c *ClusterConfig) CreateDestDir() error {
 		return errors.New("clustername is empty, call LoadClusterConfig before")
 	}
 	logrus.Infof("Creating destination dir '%s'", c.destDir)
-	err := os.MkdirAll(c.destDir, os.ModePerm)
+	err := os.MkdirAll(c.destDir, 0o750)
 	return err
 }
 

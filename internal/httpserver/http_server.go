@@ -18,7 +18,7 @@ import (
 type FzfHttpServer struct {
 	Port        int
 	ResourceHit int
-	//LastModifiedHit int
+	// LastModifiedHit int
 
 	storesMutex sync.RWMutex
 	stores      []*store.Store
@@ -61,7 +61,7 @@ func (f *FzfHttpServer) statsRoute(c *gin.Context) {
 }
 
 func (f *FzfHttpServer) resourcesRoute(c *gin.Context, resourceType resources.ResourceType) {
-	if c.Request.Method == "GET" {
+	if c.Request.Method == http.MethodGet {
 		f.ResourceHit++
 	}
 	if resourceType == resources.ResourceTypeUnknown {
@@ -105,9 +105,11 @@ func startHttpServer(ctx context.Context, listener net.Listener, srv *http.Serve
 		}
 	}()
 	<-ctx.Done()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// A fresh context is mandatory here: ctx is already done (that is what
+	// brought us here), and Shutdown needs one that is still live.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logrus.Fatalf("Server forced to shutdown: %s", err)
 	}
 	logrus.Info("Exiting http server")
@@ -122,7 +124,7 @@ func StartHttpServer(ctx context.Context, h *HttpServerConfigCli, storeConfig *s
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	listener, err := net.Listen("tcp", h.ListenAddress)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", h.ListenAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +136,15 @@ func StartHttpServer(ctx context.Context, h *HttpServerConfigCli, storeConfig *s
 	}
 	router := f.setupRouter()
 	srv := &http.Server{
-		Addr:    h.ListenAddress,
-		Handler: router,
+		Addr: h.ListenAddress,
+		// The completion binary polls this server frequently; slowloris
+		// protection keeps a stalled connection from hoarding its goroutines.
+		ReadHeaderTimeout: 5 * time.Second,
+		Handler:           router,
 	}
+	//nolint:gosec // G118: inside startHttpServer the shutdown runs after ctx
+	// is done, so it must use a fresh timeout context — ctx itself is what a
+	// graceful shutdown can no longer lean on.
 	go startHttpServer(ctx, listener, srv)
 	return &f, nil
 }

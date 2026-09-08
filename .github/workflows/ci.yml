@@ -29,6 +29,23 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # Version is pinned: upgrading golangci-lint upgrades its linters too,
+      # and a CI that starts failing without any code change is a CI nobody
+      # trusts. Bump it deliberately alongside .golangci.yml.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+
   shell:
     name: Zsh completion widget
     runs-on: ubuntu-latest

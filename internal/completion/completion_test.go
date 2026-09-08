@@ -8,11 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher/fetchertest"
 	"github.com/rooty0/kubectl-fzf/v3/internal/httpserver/httpservertest"
 	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
-	"github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,7 +173,6 @@ func TestPrepareCmdArgs(t *testing.T) {
 		cmdArgs := PrepareCmdArgs(testData.cmdArgs)
 		require.Equal(t, testData.expectedResult, cmdArgs)
 	}
-
 }
 
 func TestProcessResourceName(t *testing.T) {
@@ -186,7 +186,7 @@ func TestProcessResourceName(t *testing.T) {
 	for _, cmdArg := range cmdArgs {
 		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err)
-		require.Greater(t, len(completionResults.Completions), 0)
+		require.NotEmpty(t, completionResults.Completions)
 		require.Contains(t, completionResults.Completions[0], "kube-system\tcoredns-6d4b75cb6d-m6m4q\t172.17.0.3\t192.168.49.2\tminikube\tRunning\tBurstable\tcoredns\tCriticalAddonsOnly:,node-role.kubernetes.io/master:NoSchedule,node-role.kubernetes.io/control-plane:NoSchedule\tNone")
 	}
 }
@@ -210,7 +210,7 @@ func TestProcessResourceWithFlagsAfterCursor(t *testing.T) {
 			completionResults, err := processCommandArgsWithFetchConfig(context.Background(),
 				fetchConfig, "get", testData.args, testData.cursor)
 			require.NoError(t, err)
-			require.Greater(t, len(completionResults.Completions), 0)
+			require.NotEmpty(t, completionResults.Completions)
 			assert.Equal(t, resources.ResourceToHeader(resources.ResourceTypePod), completionResults.Header)
 			for _, completion := range completionResults.Completions {
 				assert.True(t, strings.HasPrefix(completion, "kube-system\t"),
@@ -244,7 +244,7 @@ func TestProcessResourceTypeWithFlagsAfterCursor(t *testing.T) {
 	completionResults, err := processCommandArgsWithFetchConfig(context.Background(),
 		fetchConfig, "get", []string{"sca", "-n", "kube-system"}, 0)
 	require.NoError(t, err)
-	require.Greater(t, len(completionResults.Completions), 0)
+	require.NotEmpty(t, completionResults.Completions)
 	assert.Equal(t, resources.ResourceToHeader(resources.ResourceTypeApiResource), completionResults.Header)
 }
 
@@ -270,7 +270,7 @@ func TestProcessNamespace(t *testing.T) {
 	for _, cmdArg := range cmdArgs {
 		completionResults, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.NoError(t, err)
-		require.Greater(t, len(completionResults.Completions), 0)
+		require.NotEmpty(t, completionResults.Completions)
 		require.Contains(t, completionResults.Completions[0], "default\t")
 	}
 }
@@ -318,7 +318,8 @@ func TestUnmanagedCompletion(t *testing.T) {
 	for _, cmdArg := range cmdArgs {
 		_, err := processCommandArgsWithFetchConfig(context.Background(), fetchConfig, cmdArg.verb, cmdArg.args, -1)
 		require.Errorf(t, err, "cmdArgs %s should have returned unmanaged", cmdArg)
-		require.IsType(t, parse.UnmanagedFlagError(""), err)
+		var unmanagedErr parse.UnmanagedFlagError
+		require.ErrorAs(t, err, &unmanagedErr, "cmdArgs %s should have returned unmanaged", cmdArg)
 	}
 }
 
@@ -363,7 +364,7 @@ func TestNamespaceFilterFile(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(res)
 	assert := assert.New(t)
-	assert.Len(res, 0)
+	assert.Empty(res)
 
 	// all results match
 	namespace = "kube-system"
@@ -427,10 +428,11 @@ func TestHttpServerCachePod(t *testing.T) {
 
 	podCache := path.Join(tempDir, "nothing", resources.ResourceTypePod.String())
 	assert.FileExists(t, podCache)
-	require.Equal(t, fzfHttpServer.ResourceHit, 1)
+	require.Equal(t, 1, fzfHttpServer.ResourceHit)
 	fetcher_state := path.Join(tempDir, "fetcher_state")
 	assert.FileExists(t, fetcher_state)
 
-	res, err = getResourceCompletion(context.Background(), resources.ResourceTypePod, nil, f)
-	require.Equal(t, fzfHttpServer.ResourceHit, 1)
+	_, err = getResourceCompletion(context.Background(), resources.ResourceTypePod, nil, f)
+	require.NoError(t, err)
+	require.Equal(t, 1, fzfHttpServer.ResourceHit)
 }

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/portforward"
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
-	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/portforward"
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
+	"github.com/rooty0/kubectl-fzf/v3/internal/util"
 )
 
 func (f *Fetcher) loadResourceFromHttpServer(ctx context.Context, endpoint string, r resources.ResourceType) (map[string]resources.K8sResource, error) {
@@ -33,7 +34,8 @@ func (f *Fetcher) loadResourceFromHttpServer(ctx context.Context, endpoint strin
 	if err != nil {
 		return nil, errors.Wrap(err, "error writing fetcher cache")
 	}
-	util.DecodeGob(&resources, body)
+	// Decode errors are surfaced: half-decoded resources are worse than none.
+	err = util.DecodeGob(&resources, body)
 	return resources, err
 }
 
@@ -71,11 +73,11 @@ func (f *Fetcher) getKubectlFzfPod(ctx context.Context) (*corev1.Pod, error) {
 	}
 	if len(podList.Items) == 0 {
 		err = fmt.Errorf(
-			"no kubectl-fzf pods found.\n\n" +
-				"The 'stats' command require a running kubectl-fzf-server:\n" +
+			"no kubectl-fzf pods found\n\n" +
+				"The 'stats' command requires a running kubectl-fzf-server:\n" +
 				"  - either as a Kubernetes pod labeled app=kubectl-fzf (port-forward mode), or\n" +
 				"  - via a local HTTP endpoint passed with --http-endpoint\n" +
-				"  -  e.g., ./kubectl-fzf-completion stats --http-endpoint localhost:18080\n",
+				"  -  e.g., ./kubectl-fzf-completion stats --http-endpoint localhost:18080",
 		)
 		return nil, err
 	}

@@ -45,10 +45,10 @@ func (e *Endpoints) FromRuntime(obj interface{}, config CtorConfig) {
 // HasChanged returns true if the resource's dump needs to be updated
 func (e *Endpoints) HasChanged(k K8sResource) bool {
 	oldE := k.(*Endpoints)
-	return !(util.StringSlicesEqual(e.ReadyIps, oldE.ReadyIps) &&
-		util.StringSlicesEqual(e.ReadyPods, oldE.ReadyPods) &&
-		util.StringSlicesEqual(e.NotReadyIps, oldE.NotReadyIps) &&
-		util.StringSlicesEqual(e.NotReadyIps, oldE.NotReadyIps))
+	return !util.StringSlicesEqual(e.ReadyIps, oldE.ReadyIps) ||
+		!util.StringSlicesEqual(e.ReadyPods, oldE.ReadyPods) ||
+		!util.StringSlicesEqual(e.NotReadyIps, oldE.NotReadyIps) ||
+		!util.StringSlicesEqual(e.NotReadyPods, oldE.NotReadyPods)
 }
 
 // ToString serializes the object to strings

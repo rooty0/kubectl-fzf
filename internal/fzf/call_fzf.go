@@ -45,6 +45,9 @@ func CallFzf(comps string, query string, fzfArgs []string) (string, error) {
 
 	fzfArgs = append(fzfArgs, []string{"-q", query, previewWindow, "--preview", previewCmd}...)
 	logrus.Infof("fzf args: %+v", fzfArgs)
+	//nolint:noctx // fzf is an interactive terminal tool: its lifetime is the
+	// user's keystrokes, and enclosing it in the request context would cancel
+	// the picker the moment the completion HTTP call ends.
 	cmd := exec.Command("fzf", fzfArgs...)
 	cmd.Stdout = &result
 	cmd.Stderr = os.Stderr

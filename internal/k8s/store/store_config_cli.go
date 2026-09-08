@@ -3,9 +3,10 @@ package store
 import (
 	"time"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/clusterconfig"
 )
 
 type StoreConfigCli struct {

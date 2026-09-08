@@ -33,6 +33,49 @@ docker-minikube:
 test:
 	go test ./...
 
+# Configured in .golangci.yml. Installs the pinned version into ./bin on
+# demand, so the local binary and ci.yml cannot drift apart.
+lint: golangci-lint
+	"$(GOLANGCI_LINT)" run
+
+##@ Dependencies
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p "$(LOCALBIN)"
+
+## Tool Binaries
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+
+## Tool Versions
+# Pinned to match .github/workflows/ci.yml; upgrade both together.
+GOLANGCI_LINT_VERSION ?= v2.12.2
+
+.PHONY: golangci-lint
+golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
+$(GOLANGCI_LINT): | $(LOCALBIN)
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary
+# $2 - package url which can be installed
+# $3 - specific version of package
+# Differs from the kubebuilder/kueue-helper original in one portability fix:
+# plain `readlink` instead of the GNU-only `readlink --`, which BSD readlink
+# (macOS) rejects, making every invocation reinstall the tool.
+define go-install-tool
+@[ -f "$(1)-$(3)" ] && [ "$$(readlink "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+rm -f "$(1)" ;\
+GOBIN="$(LOCALBIN)" go install $${package} ;\
+mv "$(LOCALBIN)/$$(basename "$(1)")" "$(1)-$(3)" ;\
+} ;\
+ln -sf "$$(realpath "$(1)-$(3)")" "$(1)"
+endef
+
 # Kept out of `test` so a machine without zsh can still run the Go suite.
 test-shell:
 	zsh shell/kubectl_fzf_test.zsh

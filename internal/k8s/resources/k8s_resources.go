@@ -79,7 +79,7 @@ var ExcludedLabels = map[string]string{"pod-template-generation": "",
 
 func (r *ResourceMeta) labelsString() string {
 	if len(r.Labels) == 0 {
-		return "None"
+		return util.NoneValue
 	}
 	els := util.JoinStringMap(r.Labels, ExcludedLabels, "=")
 	sort.Strings(els)

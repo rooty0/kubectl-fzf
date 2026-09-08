@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/gob"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -33,8 +32,10 @@ func EncodeToFile(data interface{}, filePath string) error {
 	}
 	tmpPath := writer.Name()
 	defer func() {
-		writer.Close()
-		os.Remove(tmpPath)
+		// Best-effort cleanup: Close already happened below on the happy path
+		// and the temp file vanishes with the rename, so errors here are noise.
+		_ = writer.Close()
+		_ = os.Remove(tmpPath)
 	}()
 
 	archiver := gzip.NewWriter(writer)
@@ -58,7 +59,7 @@ func EncodeToFile(data interface{}, filePath string) error {
 
 func LoadGobFromFile(e interface{}, filePath string) error {
 	logrus.Debugf("Loading file %s", filePath)
-	b, err := ioutil.ReadFile(filePath)
+	b, err := os.ReadFile(filePath)
 	if err != nil {
 		return errors.Wrap(err, "error reading file")
 	}

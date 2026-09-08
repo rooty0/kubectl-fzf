@@ -3,7 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -22,10 +22,10 @@ func GetFromHttpServer(ctx context.Context, url string) (http.Header, []byte, er
 		return nil, nil, errors.Wrapf(err, "error on get of %s", url)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, nil, fmt.Errorf("error retrieving resource from server: %s", resp.Status)
 	}
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error reading response body")
 	}
@@ -44,7 +44,7 @@ func HeadFromHttpServer(ctx context.Context, url string) (http.Header, error) {
 		return nil, errors.Wrapf(err, "error on get of %s", url)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error retrieving resource from server: %s", resp.Status)
 	}
 	return resp.Header, nil

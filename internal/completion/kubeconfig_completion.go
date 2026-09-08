@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/rooty0/kubectl-fzf/v3/internal/fetcher"
 	"github.com/rooty0/kubectl-fzf/v3/internal/parse"
-	"github.com/pkg/errors"
 )
 
 // kubeconfigCompletion lists what the kubeconfig names for the flag being

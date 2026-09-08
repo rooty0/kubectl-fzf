@@ -3,8 +3,9 @@ package parse
 import (
 	"strings"
 
-	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 	"github.com/sirupsen/logrus"
+
+	"github.com/rooty0/kubectl-fzf/v3/internal/k8s/resources"
 )
 
 type UnmanagedFlagError string
