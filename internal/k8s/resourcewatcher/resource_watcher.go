@@ -243,7 +243,13 @@ func (r *ResourceWatcher) DumpAPIResources() error {
 func (r *ResourceWatcher) getCacheListWatch(cfg WatchConfig, namespace string) *cache.ListWatch {
 	optionsModifier := func(options *metav1.ListOptions) {
 		options.FieldSelector = fields.Everything().String()
-		options.ResourceVersion = "0"
+		// Serve LISTs from the apiserver's watch cache. This must not leak
+		// into WATCH options: the modifier runs after the reflector filled
+		// in the resourceVersion to resume from, and clobbering it with "0"
+		// loses resume semantics on every re-watch.
+		if !options.Watch {
+			options.ResourceVersion = "0"
+		}
 	}
 	cacheListWatch := cache.NewFilteredListWatchFromClient(cfg.getter,
 		cfg.resourceType.String(), namespace, optionsModifier)

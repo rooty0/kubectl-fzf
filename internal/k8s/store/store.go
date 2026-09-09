@@ -188,12 +188,12 @@ func (k *Store) DumpFullState() error {
 	now := time.Now()
 	delta := now.Sub(k.lastFullDump)
 	if delta < k.storeConfig.GetTimeBetweenFullDump() {
-		logrus.Infof("Last full dump for %s happened %s ago, ignoring it", k.resourceType, delta)
+		logrus.Debugf("Last full dump for %s happened %s ago, ignoring it", k.resourceType, delta)
 		return nil
 	}
 	k.dumpRequired = false
 	k.lastFullDump = now
-	logrus.Infof("Doing full dump of %d %s", len(k.data), k.resourceType)
+	logrus.Debugf("Doing full dump of %d %s", len(k.data), k.resourceType)
 	destFile := k.storeConfig.GetResourceStorePath(k.resourceType)
 	return util.EncodeToFile(k.data, destFile)
 }
