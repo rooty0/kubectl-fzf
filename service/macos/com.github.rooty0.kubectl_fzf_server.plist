@@ -43,10 +43,9 @@
         <key>ThrottleInterval</key>
         <integer>10</integer>
 
-        <!-- Logs -->
-        <key>StandardOutPath</key>
-        <string>/Users/YOURUSER/Library/Logs/kubectl-fzf-server.log</string>
+        <!-- One log stream, one file: the daemon logs everything to stderr.
+             Triage with: grep 'level="warning\|level="error' on the file -->
         <key>StandardErrorPath</key>
-        <string>/Users/YOURUSER/Library/Logs/kubectl-fzf-server-error.log</string>
+        <string>/Users/YOURUSER/Library/Logs/kubectl-fzf-server.log</string>
     </dict>
 </plist>
