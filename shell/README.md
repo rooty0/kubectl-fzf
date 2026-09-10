@@ -1,5 +1,7 @@
 ### Using `k` with `kubecolor` and autocompletion
 
+This recipe is zsh-only: it wraps the ZLE widget the plugin installs. Bash auto-registers kubectl aliases when the plugin is sourced, and fish resolves aliases through function introspection, but neither can swap the command word mid-line, so a `k` that wraps kubecolor gets the shell's default completion rather than fzf. See the per-shell feature notes in the [main README](../README.md#shell-autocompletion).
+
 If you're like me and use `k` not just as an alias for `kubectl` but for something like:
 
 ```zsh
