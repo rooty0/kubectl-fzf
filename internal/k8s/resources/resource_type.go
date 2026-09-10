@@ -6,6 +6,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// The ParseResourceType and IsNamespaced tables below are hand-maintained.
+// When adding a ResourceType const, get its names, shortnames and namespaced
+// flag from `kubectl api-resources` and extend both switches.
 type UnknownResourceError struct {
 	ResourceStr string
 }
