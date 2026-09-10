@@ -74,3 +74,32 @@ func TestSetContextWithoutLoadedConfig(t *testing.T) {
 
 	require.Error(t, c.SetContext("prod"))
 }
+
+// GetClientConfig on an untouched config resolves the kubeconfig's current
+// context, exactly like before the override existed.
+func TestGetClientConfigDefaultsToCurrentContext(t *testing.T) {
+	t.Setenv("KUBECONFIG", "testdata/kubeconfig")
+	c := NewClusterConfig(&ClusterConfigCli{ClusterName: "minikube", CacheDir: "testdata"})
+	require.NoError(t, c.LoadClusterConfig())
+
+	restConfig, err := c.GetClientConfig()
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://192.168.49.2:8443", restConfig.Host)
+}
+
+// A configuration pointed at another context must build a client for that
+// context: watch-previous-context relies on it so the previous cluster gets
+// watched instead of the current one twice.
+func TestGetClientConfigFollowsSetContext(t *testing.T) {
+	t.Setenv("KUBECONFIG", "testdata/kubeconfig")
+	c := NewClusterConfig(&ClusterConfigCli{ClusterName: "minikube", CacheDir: "testdata"})
+	require.NoError(t, c.LoadClusterConfig())
+	require.NoError(t, c.SetContext("prod"))
+
+	restConfig, err := c.GetClientConfig()
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://prod.example.com", restConfig.Host)
+	assert.Equal(t, "a-token", restConfig.BearerToken)
+}

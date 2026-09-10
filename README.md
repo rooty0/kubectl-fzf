@@ -279,6 +279,8 @@ You can override FZF arguments using an environment variable:
 KUBECTL_FZF_ARGS="-1 --header-lines=2 --layout reverse --exact --no-hscroll --no-sort --cycle"
 ```
 
+The server also reads an optional config file: `.kubectl_fzf.yaml` in your home directory (or `/etc/kubectl_fzf/`). Every server flag works as a config key and a CLI argument overrides the file, so copy `kubectl_fzf.example.yaml` there and edit it. For the full list of keys and what they do, see the comments in [kubectl_fzf.example.yaml](kubectl_fzf.example.yaml).
+
 # Troubleshooting
 
 ## Debug kubectl-fzf-completion

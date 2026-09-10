@@ -171,6 +171,7 @@ func (k *Store) GetStats() *Stats {
 		}
 	}
 	return &Stats{
+		Context:          k.storeConfig.GetContext(),
 		ResourceType:     k.resourceType,
 		ItemPerNamespace: itemPerNamespaces,
 		LastDumped:       k.lastFullDump,

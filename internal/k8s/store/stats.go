@@ -10,6 +10,7 @@ import (
 )
 
 type Stats struct {
+	Context          string
 	ResourceType     resources.ResourceType
 	ItemPerNamespace map[string]int
 	LastDumped       time.Time
@@ -28,7 +29,8 @@ func (s *Stats) toTabOutput() []string {
 	now := time.Now()
 	for namespace, numItems := range s.ItemPerNamespace {
 		deltaDate := now.Sub(s.LastDumped).Truncate(time.Second)
-		line := fmt.Sprintf("%s\t%s\t%d\t%s",
+		line := fmt.Sprintf("%s\t%s\t%s\t%d\t%s",
+			s.Context,
 			s.ResourceType.String(),
 			namespace,
 			numItems,
@@ -42,7 +44,7 @@ func (s *Stats) toTabOutput() []string {
 func GetStatsOutput(stats []*Stats) string {
 	b := new(strings.Builder)
 	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', tabwriter.StripEscape)
-	fmt.Fprintln(w, "Resource\tNamespace\tNumber\tLast Dumped")
+	fmt.Fprintln(w, "Context\tResource\tNamespace\tNumber\tLast Dumped")
 	for _, s := range stats {
 		for _, line := range s.toTabOutput() {
 			fmt.Fprintln(w, line)

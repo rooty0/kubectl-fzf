@@ -129,7 +129,17 @@ func (c *ClusterConfig) GetClientConfig() (*rest.Config, error) {
 		}
 	}
 
-	cmdConfig := clientcmd.NewDefaultClientConfig(*c.apiConfig, nil)
+	// By default the client targets the kubeconfig's current context. A
+	// configuration pointed at another context through SetContext must resolve
+	// that context instead, or every watch generation would watch the current
+	// cluster while writing under the other context's cache directory.
+	overrides := &clientcmd.ConfigOverrides{}
+	if !c.IsCurrentContext() {
+		if _, ok := c.apiConfig.Contexts[c.clusterName]; ok {
+			overrides.CurrentContext = c.clusterName
+		}
+	}
+	cmdConfig := clientcmd.NewDefaultClientConfig(*c.apiConfig, overrides)
 	restConfig, err = cmdConfig.ClientConfig()
 	return restConfig, err
 }

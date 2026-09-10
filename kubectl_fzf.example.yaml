@@ -1,8 +1,41 @@
-# Role to hide from the role list in node completion
-ignore-node-role:
-  - compute
-# Namespaces to exclude for configmap and pod
-# Regexps are accepted
+# kubectl-fzf configuration, shared by both binaries.
+# Copy to ~/.kubectl_fzf.yaml and edit. Every server flag also works here
+# (`kubectl-fzf-server --log-level debug` is `log-level: debug`), and a CLI
+# argument always wins over this file. Keys a binary does not register are
+# ignored, so one file can safely serve both binaries.
+
+# Log noise. One of: trace, debug, info, warning, error, fatal.
+# log-level: info
+
+# Where the daemon writes the per-context caches the completion reads.
+# cache-dir: /tmp/kubectl_fzf_cache/
+
+# HTTP server the completion binary talks to. Empty disables it.
+# listen-address: localhost:18080
+# pprof profiling endpoint.
+# http-prof-address: localhost:6060
+# http-debug: false
+
+# Seconds between cache rewrites to disk when resources changed.
+# time-between-full-dump: 10s
+
+# Also watch the previously selected kubeconfig context, keeping its cache
+# fresh for --context completion. Roughly doubles heap and apiserver watch
+# traffic.
+# watch-previous-context: false
+
+# Which resources to watch. Both empty means all; watch-resources wins over
+# exclude-resources when set. The full set to pick from:
+# pods,configmaps,services,serviceaccounts,replicasets,daemonsets,secrets,
+# statefulsets,deployments,endpoints,ingresses,cronjobs,jobs,
+# horizontalpodautoscalers,persistentvolumes,persistentvolumeclaims,nodes,
+# namespaces
+# watch-resources: []
+# exclude-resources: []
+
+# Namespace filters; regexps are accepted.
+# watch-namespaces:
+#   - .*
 exclude-namespaces:
   - consul-agent
   - datadog-agent
@@ -10,3 +43,18 @@ exclude-namespaces:
   - kube-system
   - kube2iam
   - dev-.*
+
+# Roles to hide from the role list in node completion.
+ignore-node-roles:
+  - compute
+
+# Poll pacing for the two resources that are polled rather than watched.
+# node-polling-period: 300s
+# namespace-polling-period: 600s
+
+# Exit the daemon when a watch reports unauthorized.
+# exit-on-unauthorized: false
+
+# Developer diagnostics, written on exit for go tool pprof.
+# cpu-profile: ""
+# mem-profile: ""

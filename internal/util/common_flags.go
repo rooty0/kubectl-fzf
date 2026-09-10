@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"path/filepath"
 	"runtime/pprof"
 	"strings"
 
@@ -42,6 +43,14 @@ func ConfigureViper() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	viper.SetConfigName(".kubectl_fzf")
+	// Developer convenience: a config next to the binary outranks the
+	// system paths (viper searches paths in the order they are added),
+	// so a local .kubectl_fzf.yaml wins for quick experiments.
+	if exe, err := os.Executable(); err == nil {
+		if exe, err := filepath.EvalSymlinks(exe); err == nil {
+			viper.AddConfigPath(filepath.Dir(exe))
+		}
+	}
 	viper.AddConfigPath("/etc/kubectl_fzf/")
 	viper.AddConfigPath("$HOME")
 	err = viper.ReadInConfig()

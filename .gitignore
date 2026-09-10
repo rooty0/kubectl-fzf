@@ -136,3 +136,7 @@ tags
 TODO
 /kubectl-fzf-server
 /kubectl-fzf-completion
+# Local operator config; the daemon reads .kubectl_fzf.* from $HOME or
+# /etc/kubectl_fzf, keep experiments out of the repo
+kubectl_fzf.yaml
+.kubectl_fzf.yaml
