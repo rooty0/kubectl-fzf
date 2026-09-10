@@ -13,7 +13,7 @@ type HttpServerConfigCli struct {
 
 func SetHttpServerConfigFlags(fs *pflag.FlagSet) {
 	fs.String("listen-address", "localhost:18080", "Listen address of the http server (empty to disable)")
-	fs.String("http-prof-address", "localhost:6060", "Listen address of the pprof endpoint")
+	fs.String("http-prof-address", "", "Listen address of the pprof endpoint (e.g. localhost:6060). Empty disables profiling")
 	fs.Bool("http-debug", false, "Activate debug mode of the http server")
 }
 

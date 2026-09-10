@@ -12,7 +12,8 @@
 
 # HTTP server the completion binary talks to. Empty disables it.
 # listen-address: localhost:18080
-# pprof profiling endpoint.
+# pprof profiling endpoint. Empty (the default) disables it; profiling is a
+# developer tool and a heap dump leaks cluster object metadata locally.
 # http-prof-address: localhost:6060
 # http-debug: false
 

@@ -190,15 +190,19 @@ func StartKubectlFzfServer() {
 		logrus.Fatalf("Error starting http server: %s", err)
 	}
 
-	// Profiling endpoint, localhost-only; ReadHeaderTimeout satisfies the
-	// Slowloris hardening without hurting long-lived pprof scrapes.
-	pprofServer := &http.Server{
-		Addr:              "localhost:6060",
-		ReadHeaderTimeout: 5 * time.Second,
+	// Profiling endpoint, off unless asked for: a heap dump leaks cluster
+	// object metadata to any local process, and only developers profiling
+	// the daemon ever read it. ReadHeaderTimeout satisfies the Slowloris
+	// hardening without hurting long-lived pprof scrapes.
+	if httpServerConfCli.HttpProfAddress != "" {
+		pprofServer := &http.Server{
+			Addr:              httpServerConfCli.HttpProfAddress,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		go func() {
+			logrus.Println(pprofServer.ListenAndServe())
+		}()
 	}
-	go func() {
-		logrus.Println(pprofServer.ListenAndServe())
-	}()
 
 	for {
 		select {
